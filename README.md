@@ -97,9 +97,6 @@ File CSV phải có các cột sau (encoding UTF-8):
 
 | Tên | Vai trò |
 |-----|---------|
-<<<<<<< HEAD
-| **Nhóm 3** | Lê Mạnh Quân, Hoàng Văn Thịnh, Đào Mạnh Huy, Ngô Hoàng Tuấn Tú |
-=======
 | Lê Mạnh Quân  | Người viết code |
 |Hoàng Văn Thịnh | Người thuyết trình |
 |Đào Mạnh Huy    | người làm báo cáo |
