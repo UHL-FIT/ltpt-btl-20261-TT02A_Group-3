@@ -1,10 +1,9 @@
 """
 main.py
 =======
-Khởi chạy ứng dụng.
-  - Mặc định (không tham số): Quản lý Công thức Nấu ăn (GUI)
-  - --diemdanh              : SmartAttend (GUI gốc)
-  - --cli                   : Giao diện dòng lệnh
+Khởi chạy ứng dụng Quản lý Công thức Nấu ăn.
+  - Mặc định (không tham số): Mở giao diện GUI
+  - --cli                   : Mở giao diện dòng lệnh (CLI)
 """
 
 import sys
@@ -26,12 +25,6 @@ if __name__ == "__main__":
         logger.info("Chạy chế độ CLI.")
         from controllers import cli_controller
         cli_controller.chay_ung_dung()
-
-    elif "--diemdanh" in args:
-        logger.info("Chạy SmartAttend (điểm danh) GUI.")
-        from controllers import gui_controller
-        gui_controller.chay_ung_dung()
-
     else:
         logger.info(f"=== Khởi chạy Quản lý Công thức Nấu ăn v{__version__} ===")
         from controllers import gui_controller_congthuc

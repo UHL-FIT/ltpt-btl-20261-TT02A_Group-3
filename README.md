@@ -67,10 +67,6 @@ ltpt-btl-20261-nhom-3/
 python main.py
 ```
 
-**SmartAttend – Điểm danh (GUI gốc)**
-```bash
-python main.py --diemdanh
-```
 
 **Giao diện Dòng lệnh (CLI)**
 ```bash
