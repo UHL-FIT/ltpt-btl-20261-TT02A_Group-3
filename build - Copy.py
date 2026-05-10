@@ -1,14 +1,13 @@
 """
 build.py
 ========
-Script dong goi ung dung Quan Ly Cong Thuc Nau An thanh file .exe
-bang PyInstaller.
+Script dong goi ung dung thanh file .exe cho Windows bang PyInstaller.
 
 Cach dung:
     python build.py
 
 Ket qua:
-    dist/CongThucNauAn/CongThucNauAn.exe   (thu muc chua exe + data)
+    dist/QuanLyDiem/QuanLyDiem.exe   (thu muc chua exe + data)
 """
 
 import subprocess
@@ -17,7 +16,7 @@ import os
 import shutil
 
 # --- CAU HINH ---
-TEN_APP = "CongThucNauAn"
+TEN_APP = "SmartAttend"
 FILE_MAIN = "main.py"
 THU_MUC_DATA = "data"
 THU_MUC_ASSETS = "assets"
@@ -47,7 +46,7 @@ def xoa_build_cu():
 
 
 def tao_installer():
-    """Goi Inno Setup Compiler de tao file Setup_CongThucNauAn.exe"""
+    """Goi Inno Setup Compiler de tao file Setup_QuanLyDiem.exe"""
     print("\n  [4/4] Dang tao file cai dat (Installer)...")
     iscc_path = r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
     
@@ -78,7 +77,7 @@ def tao_installer():
 def build():
     """Chay PyInstaller de dong goi."""
     print("\n" + "=" * 50)
-    print("  DONG GOI UNG DUNG QUAN LY CONG THUC NAU AN")
+    print("  DONG GOI UNG DUNG QUAN LY DIEM SINH VIEN")
     print("=" * 50)
 
     # 1. Kiem tra PyInstaller

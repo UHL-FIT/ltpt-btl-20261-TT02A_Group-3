@@ -1,41 +1,111 @@
 # Mã nguồn chuẩn (Coding Conventions)
+# Quản Lý Công Thức Nấu Ăn – Nhóm 3
 
-Dự án `SmartAttend` hướng đến độ ổn định, khả năng bảo trì và có thể bàn giao thương mại (Client-ready). Mọi đoạn code được viết ra phải tuân thủ nghiêm ngặt các tiêu chuẩn sau:
+Dự án `Quản lý Công thức Nấu ăn` hướng đến độ ổn định, khả năng bảo trì và có thể bàn giao (client-ready). Mọi đoạn code được viết ra phải tuân thủ nghiêm ngặt các tiêu chuẩn sau:
+
+---
 
 ## 1. Naming Conventions (Quy chuẩn Đặt tên)
+
 Áp dụng tiêu chuẩn **PEP 8**:
-- **Biến và Hàm (Variables & Functions)**: Sử dụng `snake_case`. (Ví dụ: `lay_danh_sach()`, `tong_sv`).
-- **Hằng số (Constants)**: Sử dụng `UPPER_SNAKE_CASE`. (Ví dụ: `FILE_DIEMDANH`, `MAX_WEEKS`).
-- **Lớp (Classes - Nếu có)**: Sử dụng `PascalCase`. (Ví dụ: `StudentManager`).
+
+- **Biến và Hàm**: Sử dụng `snake_case`.  
+  Ví dụ: `lay_danh_sach()`, `them_cong_thuc()`, `tong_ct`
+- **Hằng số**: Sử dụng `UPPER_SNAKE_CASE`.  
+  Ví dụ: `FILE_CONGTHUC`, `LOAI_MON_LIST`, `COLS_CSV`
+- **Lớp (nếu có)**: Sử dụng `PascalCase`.  
+  Ví dụ: `RecipeManager`
+- **Tên file module**: `snake_case`, mô tả chức năng rõ ràng.  
+  Ví dụ: `gui_view_congthuc.py`, `gui_controller_congthuc.py`
+
+---
 
 ## 2. Quản lý Phiên bản (Versioning)
-Sử dụng **Semantic Versioning (SemVer)** `v[MAJOR].[MINOR].[PATCH]` để đánh dấu các bản release.
-- **`MAJOR`**: Thay đổi cấu trúc dữ liệu hoặc luồng lớn khiến phiên bản cũ không còn tương thích (Ví dụ từ `v1.x` lên `v2.0.0`).
-- **`MINOR`**: Thêm tính năng mới (Ví dụ: Thêm cột giới tính, lọc theo danh sách).
-- **`PATCH`**: Vá lỗi (Bug fixes), chỉnh sửa UI nhỏ giọt.
-- Phiên bản hiện tại của app được đánh dấu toàn cục ở `__version__ = "1.0.0"` tại file entry point.
+
+Sử dụng **Semantic Versioning (SemVer)** `v[MAJOR].[MINOR].[PATCH]`:
+
+| Loại | Khi nào dùng | Ví dụ |
+|------|-------------|-------|
+| `MAJOR` | Thay đổi cấu trúc dữ liệu CSV hoặc kiến trúc lớn | `v1.x` → `v2.0.0` |
+| `MINOR` | Thêm tính năng mới (cột mới, filter mới, thống kê mới) | `v1.0` → `v1.1.0` |
+| `PATCH` | Vá lỗi, chỉnh sửa UI nhỏ | `v1.0.0` → `v1.0.1` |
+
+Phiên bản hiện tại được khai báo tại `main.py`:
+```python
+__version__ = "1.0.0"
+```
+
+---
 
 ## 3. Khối Chú thích (Docstrings)
-Mọi hàm, module bắt buộc phải có Docstring mô tả theo cấu trúc **Google Python Style Guide**:
+
+Mọi hàm và module **bắt buộc** có Docstring theo chuẩn **Google Python Style Guide**:
+
 ```python
-def cap_nhat_diem_danh(df, msv, tuan, trang_thai):
+def them_cong_thuc(df, data):
     """
-    Cập nhật trạng thái điểm danh của một sinh viên trong một tuần học cụ thể.
+    Thêm một công thức nấu ăn mới vào DataFrame.
 
     Args:
-        df (pandas.DataFrame): Bảng dữ liệu điểm danh hiện tại.
-        msv (str): Mã sinh viên cần cập nhật.
-        tuan (str): Chuỗi định danh của tuần (Ví dụ: 't1', 't2').
-        trang_thai (str): Trạng thái điểm danh (M/P/K).
+        df (pandas.DataFrame): Bảng dữ liệu công thức hiện tại.
+        data (dict): Thông tin công thức mới gồm các key:
+            ten_mon (str), loai_mon (str), nguyen_lieu (str),
+            dinh_luong (str), thoi_gian (int).
 
     Returns:
-        tuple: (DataFrame mới, bool True nếu thành công / False nếu thất bại)
+        tuple: (DataFrame mới, bool True nếu thành công, str thông báo)
     """
 ```
 
+**Quy tắc bổ sung:**
+- Mọi hàm Model trả về tuple `(df, bool, str)` để Controller xử lý nhất quán.
+- File module phải có docstring mô tả mục đích và layer (Model/View/Controller).
+
+---
+
 ## 4. Hệ thống Vết (Logging)
-Thay vì sử dụng `print()`, toàn bộ hành vi quan trọng phải sử dụng module `utils/logger.py`. Log sẽ được tự động xuất ra file `data/app.log`.
-- `logger.debug()`: Dùng cho các vòng lặp, chi tiết xử lý nội bộ (Dev đọc).
-- `logger.info()`: Dùng để ghi lại VẾT thao tác của user: *Thêm/Sửa/Xóa/Tìm kiếm*.
-- `logger.warning()`: Dùng cho các lỗi logic nhỏ, cảnh báo tài nguyên.
-- `logger.error()`: Bắt buộc dùng trong mọi block `try...except` để lưu chi tiết mã lỗi (Traceback) phục vụ debug/bảo hành.
+
+Thay vì dùng `print()`, toàn bộ hành vi quan trọng phải dùng `utils/logger.py`.  
+Log tự động ghi ra `data/app.log`.
+
+| Mức | Khi nào dùng |
+|-----|-------------|
+| `logger.debug()` | Chi tiết xử lý nội bộ, vòng lặp (dev đọc) |
+| `logger.info()` | Ghi vết thao tác user: Thêm / Sửa / Xóa / Tìm kiếm |
+| `logger.warning()` | Lỗi logic nhỏ, thiếu dữ liệu tùy chọn |
+| `logger.error()` | Bắt buộc trong mọi `try...except`, kèm chi tiết lỗi |
+
+---
+
+## 5. Input Validation
+
+Controller chịu trách nhiệm validate trước khi gọi Model:
+
+- **Trường bắt buộc trống** → Hiển thị label đỏ ngay trong form: `"⚠ Mời bạn nhập Tên món ăn!"`
+- **Sai kiểu dữ liệu** (thời gian không phải số) → `"⚠ Thời gian phải là số nguyên >= 0!"`
+- **Trùng dữ liệu** → `messagebox.showerror` với thông báo rõ ràng
+- **Chọn nhiều dòng khi Sửa** → `"Chỉ được chọn 1 công thức để sửa!"`
+- **Không chọn dòng khi Xóa** → `"Vui lòng tick (☑) ít nhất 1 công thức để xóa!"`
+
+---
+
+## 6. Cấu trúc Commit Message
+
+Định dạng: `[type]: [nội dung ngắn gọn bằng tiếng Việt`
+
+| Type | Ý nghĩa |
+|------|---------|
+| `feat` | Thêm tính năng mới |
+| `fix` | Vá lỗi |
+| `refactor` | Tái cấu trúc code, không đổi logic |
+| `docs` | Cập nhật tài liệu (README, SRS, SAD) |
+| `style` | Thay đổi UI/UX, màu sắc, layout |
+| `test` | Thêm hoặc sửa unit test |
+| `chore` | Cấu hình build, script .bat |
+
+**Ví dụ:**
+```
+feat: thêm chức năng thống kê nguyên liệu phổ biến
+fix: sửa lỗi sort cột khi giá trị rỗng
+docs: cập nhật SAD.md theo kiến trúc MVC mới
+```

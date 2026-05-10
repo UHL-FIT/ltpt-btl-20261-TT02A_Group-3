@@ -1,8 +1,7 @@
 @echo off
-title Chay Kiem Thu - Quan Ly Cong Thuc Nau An
+title Chay Kiem Thu (Unit Tests)
 echo ========================================================
-echo   DANG CHAY KIEM THU TU DONG (UNIT TESTS)
-echo   Du an: Quan Ly Cong Thuc Nau An - Nhom 3
+echo DANG CHAY KIEM THU TU DONG (UNIT TESTS)
 echo ========================================================
 
 :: Kiem tra moi truong ao
@@ -15,17 +14,7 @@ if not exist ".venv\Scripts\activate.bat" (
 
 :: Kich hoat moi truong ao va chay test
 call .venv\Scripts\activate.bat
-
-echo.
-echo [1/2] Chay test model Cong Thuc Nau An...
-python -m unittest tests.test_congthuc -v
-
-echo.
-echo [2/2] Chay toan bo test (discover)...
 python -m unittest discover -s tests -p "test_*.py" -v
 
-echo.
-echo ========================================================
-echo HOAN THANH KIEM THU
 echo ========================================================
 pause
