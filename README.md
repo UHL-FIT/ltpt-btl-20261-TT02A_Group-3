@@ -124,7 +124,10 @@ File CSV phải có các cột sau (encoding UTF-8):
 
 | Tên | Vai trò |
 |-----|---------|
-| **Nhóm 3** | Lê Mạnh Quân, Hoàng Văn Thịnh, Đào Mạnh Huy, Ngô Hoàng Tuấn Tú |
+| Lê Mạnh Quân  | Người viết code |
+|Hoàng Văn Thịnh | Người thuyết trình |
+|Đào Mạnh Huy    | người làm báo cáo |
+|Ngô Hoàng Tuấn Tú |  |
 | **ThS. Vũ Duy Sơn** | Giảng viên hướng dẫn · vuduyson@daihochalong.edu.vn |
 
 ---
