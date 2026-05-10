@@ -58,26 +58,12 @@ ltpt-btl-20261-nhom-3/
 
 ---
 
-## 🚀 Hướng dẫn cài đặt & chạy
+## 🚀 Hướng dẫn chạy ứng dụng
 
-### Bước 1 – Khởi tạo môi trường
-
-Nhấp đúp vào `setup_env.bat` (Windows) để tự động:
-- Tạo môi trường ảo `.venv`
-- Cài đặt toàn bộ thư viện từ `requirements.txt` (`pandas`, `numpy`, v.v.)
-
-Hoặc thực hiện thủ công:
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### Bước 2 – Chạy ứng dụng
+*Lưu ý: Yêu cầu môi trường Python đã được kích hoạt.*
 
 **Quản lý Công thức Nấu ăn (GUI – Mặc định)**
 ```bash
-.venv\Scripts\activate
 python main.py
 ```
 
@@ -89,19 +75,6 @@ python main.py --diemdanh
 **Giao diện Dòng lệnh (CLI)**
 ```bash
 python main.py --cli
-```
-
-### Bước 3 – Đóng gói file `.exe` (tuỳ chọn)
-
-```bash
-build.bat
-```
-Xuất ra `dist/` hoặc `Setup_CongThuc.exe` nếu dùng Inno Setup.
-
-### Bước 4 – Dọn dẹp (tuỳ chọn)
-
-```bash
-clean.bat
 ```
 
 ---

@@ -113,9 +113,23 @@ def tao_giao_dien_chinh(root):
         background=COLOR_SURFACE,
         foreground=COLOR_TEXT,
         relief="flat", padding=6)
+    # Fix hover (active state) – theme clam mặc định tô trắng khi di chuột
     style.map("Treeview",
-        background=[("selected", COLOR_SEL)],
-        foreground=[("selected", "#fff")])
+        background=[
+            ("selected", COLOR_SEL),
+            ("active",   COLOR_PANEL),     # nền hover: tím tối nhẹ
+        ],
+        foreground=[
+            ("selected", "#fff"),
+            ("active",   COLOR_TEXT),      # chữ hover: giữ màu sáng
+        ])
+    style.map("Treeview.Heading",
+        background=[
+            ("active", COLOR_BORDER),      # heading hover: viền tối
+        ],
+        foreground=[
+            ("active", COLOR_TEXT),
+        ])
 
     ui = {}
 
@@ -446,7 +460,15 @@ def hien_thi_thong_ke(parent, stats):
     top = tk.Toplevel(parent)
     top.title("📊 Thống kê Công thức Nấu ăn")
     top.configure(bg=COLOR_BG)
+    
+    # Cho phép resize, định nghĩa kích thước tối đa/tối thiểu
     top.resizable(True, True)
+    top.minsize(400, 300)
+    
+    # Lấy kích thước màn hình để không vượt quá chiều cao màn hình
+    screen_height = top.winfo_screenheight()
+    max_height = int(screen_height * 0.8)
+
     top.grab_set()
 
     tk.Label(top,
@@ -467,8 +489,47 @@ def hien_thi_thong_ke(parent, stats):
         top.geometry(f"+{px + (pw - tw)//2}+{py + (ph - th)//2}")
         return
 
-    main = tk.Frame(top, bg=COLOR_BG, padx=20, pady=14)
-    main.pack(fill=tk.BOTH, expand=True)
+    # Frame chính chứa Canvas và Scrollbar
+    container = tk.Frame(top, bg=COLOR_BG)
+    container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    # Canvas
+    canvas = tk.Canvas(container, bg=COLOR_BG, highlightthickness=0)
+    
+    # Scrollbar
+    scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    
+    # Frame chứa nội dung (bên trong canvas)
+    main = tk.Frame(canvas, bg=COLOR_BG)
+
+    # Cấu hình canvas
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Pack canvas và scrollbar
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+
+    # Hàm xử lý khi nội dung main thay đổi
+    def on_frame_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    main.bind("<Configure>", on_frame_configure)
+
+    # Hàm xử lý để frame nội dung luôn rộng bằng canvas
+    def on_canvas_configure(event):
+        canvas.itemconfig(canvas_window, width=event.width)
+
+    canvas.bind("<Configure>", on_canvas_configure)
+
+    # Đưa frame main vào canvas
+    canvas_window = canvas.create_window((0, 0), window=main, anchor="nw")
+
+    # Cho phép cuộn bằng con lăn chuột
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
 
     def section(txt):
         tk.Label(main, text=txt,
@@ -509,12 +570,41 @@ def hien_thi_thong_ke(parent, stats):
                  bg=COLOR_BG, fg=COLOR_MUTED,
                  font=("Segoe UI", 9, "italic")).pack(anchor="w")
 
-    ttk.Button(main, text="Đóng", style="Neutral.TButton",
-               command=top.destroy).pack(pady=(18, 4))
+    # Nút đóng đặt ngoài canvas, ở dưới cùng của cửa sổ popup
+    frame_btn = tk.Frame(top, bg=COLOR_BG)
+    frame_btn.pack(fill=tk.X, pady=(0, 10))
+    
+    ttk.Button(frame_btn, text="Đóng", style="Neutral.TButton",
+               command=top.destroy).pack()
 
     top.update_idletasks()
+    
+    # Tính toán kích thước
+    req_width = top.winfo_reqwidth()
+    req_height = top.winfo_reqheight()
+    
+    # Đặt giới hạn chiều cao
+    if req_height > max_height:
+        req_height = max_height
+    
+    # Giữ chiều rộng nhỏ nhất là 450
+    if req_width < 450:
+         req_width = 450
+
     pw, ph = parent.winfo_width(), parent.winfo_height()
     px, py = parent.winfo_x(), parent.winfo_y()
-    tw, th = top.winfo_reqwidth(), top.winfo_reqheight()
-    top.geometry(f"+{px+(pw-tw)//2}+{py+(ph-th)//2}")
+    
+    # Căn giữa
+    x = px + (pw - req_width) // 2
+    y = py + (ph - req_height) // 2
+    
+    top.geometry(f"{req_width}x{req_height}+{x}+{y}")
+    
+    # Xóa binding chuột khi đóng cửa sổ
+    def _on_destroy(event):
+        if event.widget == top:
+             canvas.unbind_all("<MouseWheel>")
+             
+    top.bind("<Destroy>", _on_destroy)
+
     top.wait_window()
