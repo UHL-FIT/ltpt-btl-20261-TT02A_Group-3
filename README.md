@@ -101,7 +101,6 @@ File CSV phải có các cột sau (encoding UTF-8):
 |Hoàng Văn Thịnh | Người thuyết trình |
 |Đào Mạnh Huy    | người làm báo cáo |
 |Ngô Hoàng Tuấn Tú |  |
->>>>>>> cb4812a72a2352ded2706e5c51bd1736f497fd48
 | **ThS. Vũ Duy Sơn** | Giảng viên hướng dẫn · vuduyson@daihochalong.edu.vn |
 
 ---
