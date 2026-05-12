@@ -32,7 +32,6 @@ ltpt-btl-20261-nhom-3/
 │   ├── gui_controller_congthuc.py  # Controller GUI – Công thức Nấu ăn (MÔN HỌC)
 ├── data/
 │   ├── congthuc.csv                # Dữ liệu công thức nấu ăn
-│   └── diemdanh.csv                # Dữ liệu điểm danh (gốc)
 ├── models/
 │   ├── congthuc.py                 # Model – Công thức Nấu ăn (pandas + numpy)
 │   └── diemdanh.py                 # Model – Điểm danh (gốc)
