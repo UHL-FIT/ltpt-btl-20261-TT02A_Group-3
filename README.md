@@ -34,7 +34,6 @@ ltpt-btl-20261-nhom-3/
 │   ├── congthuc.csv                # Dữ liệu công thức nấu ăn
 ├── models/
 │   ├── congthuc.py                 # Model – Công thức Nấu ăn (pandas + numpy)
-│   └── diemdanh.py                 # Model – Điểm danh (gốc)
 ├── views/
 │   ├── gui_view_congthuc.py        # View – Giao diện Công thức Nấu ăn
 ├── utils/
