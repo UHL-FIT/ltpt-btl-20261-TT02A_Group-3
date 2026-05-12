@@ -30,8 +30,6 @@ ltpt-btl-20261-nhom-3/
 ├── assets/                         # Icon và tài nguyên ảnh
 ├── controllers/
 │   ├── gui_controller_congthuc.py  # Controller GUI – Công thức Nấu ăn (MÔN HỌC)
-│   ├── gui_controller.py           # Controller GUI – SmartAttend (gốc)
-│   └── cli_controller.py           # Controller CLI
 ├── data/
 │   ├── congthuc.csv                # Dữ liệu công thức nấu ăn
 │   └── diemdanh.csv                # Dữ liệu điểm danh (gốc)
@@ -40,8 +38,6 @@ ltpt-btl-20261-nhom-3/
 │   └── diemdanh.py                 # Model – Điểm danh (gốc)
 ├── views/
 │   ├── gui_view_congthuc.py        # View – Giao diện Công thức Nấu ăn
-│   ├── gui_view.py                 # View – Giao diện SmartAttend (gốc)
-│   └── cli_view.py                 # View – Dòng lệnh
 ├── utils/
 │   └── logger.py                   # Tiện ích ghi log
 ├── main.py                         # Entry Point (mặc định: Công thức Nấu ăn)
