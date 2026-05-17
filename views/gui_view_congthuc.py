@@ -5,8 +5,15 @@ Giao diện GUI Tkinter cho bài toán Quản lý Công thức Nấu ăn.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
+import os
 from models.congthuc import LOAI_MON_LIST
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image, ImageTk
 
 # ─── Màu sắc ─────────────────────────────────────────
 COLOR_BG        = "#1E1E2E"
@@ -80,7 +87,7 @@ def tao_giao_dien_chinh(root):
     Returns:
         dict: Các widget tham chiếu.
     """
-    import sys, os
+    import os
 
     root.title("🍳 Quản lý Công thức Nấu ăn")
     root.geometry("1280x720")
@@ -89,8 +96,7 @@ def tao_giao_dien_chinh(root):
 
     # Icon
     try:
-        base = sys._MEIPASS if getattr(sys, "frozen", False) else \
-               os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         ico = os.path.join(base, "assets", "app_icon.ico")
         if os.path.exists(ico):
             root.iconbitmap(default=ico)
@@ -163,15 +169,6 @@ def tao_giao_dien_chinh(root):
     ttk.Separator(frame_left, orient=tk.VERTICAL).pack(
         side=tk.LEFT, fill=tk.Y, padx=10, pady=4)
 
-    ui["btn_import"] = ttk.Button(frame_left, text="📂 Import CSV", style="Neutral.TButton")
-    ui["btn_import"].pack(side=tk.LEFT, padx=3)
-
-    ui["btn_export"] = ttk.Button(frame_left, text="💾 Export CSV", style="Neutral.TButton")
-    ui["btn_export"].pack(side=tk.LEFT, padx=3)
-
-    ttk.Separator(frame_left, orient=tk.VERTICAL).pack(
-        side=tk.LEFT, fill=tk.Y, padx=10, pady=4)
-
     ui["btn_thongke"] = ttk.Button(frame_left, text="📊 Thống kê", style="Neutral.TButton")
     ui["btn_thongke"].pack(side=tk.LEFT, padx=3)
 
@@ -207,33 +204,22 @@ def tao_giao_dien_chinh(root):
     ui["btn_clear"] = ttk.Button(frame_right, text="✖", style="Neutral.TButton", width=3)
     ui["btn_clear"].pack(side=tk.LEFT, padx=2)
 
-    # ═══════════════ MAIN CONTENT (table + scrollbar) ═
+    # ═══════════════ MAIN CONTENT (table) ════════════════
     frame_mid = tk.Frame(root, bg=COLOR_BG, padx=12, pady=6)
     frame_mid.pack(fill=tk.BOTH, expand=True)
 
-    scroll_y = ttk.Scrollbar(frame_mid)
-    scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-    scroll_x = ttk.Scrollbar(frame_mid, orient=tk.HORIZONTAL)
-    scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
-
-    cols = ["Chọn", "STT", "Tên món", "Loại món", "Nguyên liệu", "Định lượng", "TG (phút)"]
+    cols = ["Chọn", "STT", "Tên món", "Loại món", "TG (phút)"]
     ui["cols"] = cols
 
-    tree = ttk.Treeview(frame_mid, columns=cols, show="headings",
-                        yscrollcommand=scroll_y.set,
-                        xscrollcommand=scroll_x.set)
+    tree = ttk.Treeview(frame_mid, columns=cols, show="headings")
     ui["tree"] = tree
-    scroll_y.config(command=tree.yview)
-    scroll_x.config(command=tree.xview)
 
     col_widths = {
-        "Chọn": 45, "STT": 45, "Tên món": 200, "Loại món": 110,
-        "Nguyên liệu": 280, "Định lượng": 200, "TG (phút)": 90
+        "Chọn": 50, "STT": 55, "Tên món": 420, "Loại món": 160, "TG (phút)": 110
     }
     col_anchor = {
         "Chọn": tk.CENTER, "STT": tk.CENTER, "Tên món": tk.W,
-        "Loại món": tk.CENTER, "Nguyên liệu": tk.W,
-        "Định lượng": tk.W, "TG (phút)": tk.CENTER
+        "Loại món": tk.CENTER, "TG (phút)": tk.CENTER
     }
     for col in cols:
         if col == "Chọn":
@@ -287,16 +273,12 @@ def hien_thi_bang(ui, df):
         return
 
     for idx, (_, row) in enumerate(df.iterrows(), start=1):
-        nl = row.get("nguyen_lieu", "")
-        dl = row.get("dinh_luong", "")
         tg = row.get("thoi_gian", 0)
         values = [
             "☐",
             str(idx),
             row.get("ten_mon", ""),
             row.get("loai_mon", ""),
-            nl.replace("|", " | ") if nl else "",
-            dl.replace("|", " | ") if dl else "",
             str(tg),
         ]
         tag = "odd" if idx % 2 else "even"
@@ -372,6 +354,32 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
     ent_tg = ttk.Entry(main, width=14, font=("Segoe UI", 10))
     ent_tg.grid(row=9, column=0, sticky="w", pady=(0, 2))
 
+    lbl("Cách làm (mỗi bước một dòng)", 10)
+    txt_cl = tk.Text(main, height=6, width=50, font=("Segoe UI", 10),
+                     bg=COLOR_SURFACE, fg=COLOR_TEXT,
+                     insertbackground=COLOR_TEXT, relief="flat",
+                     highlightthickness=1, highlightcolor=COLOR_ACCENT)
+    txt_cl.grid(row=11, column=0, sticky="ew", pady=(0, 2))
+
+    lbl("💡 Lưu ý khi nấu (mỗi ý một dòng)", 12)
+    txt_ly = tk.Text(main, height=4, width=50, font=("Segoe UI", 10),
+                     bg=COLOR_SURFACE, fg=COLOR_TEXT,
+                     insertbackground=COLOR_TEXT, relief="flat",
+                     highlightthickness=1, highlightcolor=COLOR_WARN)
+    txt_ly.grid(row=13, column=0, sticky="ew", pady=(0, 2))
+
+    lbl("Hình ảnh (chọn file .png, .jpg)", 14)
+    frame_img = tk.Frame(main, bg=COLOR_BG)
+    frame_img.grid(row=15, column=0, sticky="ew", pady=(0, 2))
+    ent_img = ttk.Entry(frame_img, font=("Segoe UI", 10))
+    ent_img.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+    def on_choose_img():
+        path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png *.jpg *.jpeg *.bmp")])
+        if path:
+            ent_img.delete(0, tk.END)
+            ent_img.insert(0, path)
+    ttk.Button(frame_img, text="📂 Chọn", style="Neutral.TButton", command=on_choose_img).pack(side=tk.LEFT)
+
     main.columnconfigure(0, weight=1)
 
     # Điền sẵn dữ liệu khi sửa
@@ -383,11 +391,14 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
         dl = current_data.get("dinh_luong", "")
         txt_dl.insert("1.0", dl)
         ent_tg.insert(0, str(current_data.get("thoi_gian", 0)))
+        txt_cl.insert("1.0", str(current_data.get("cach_lam", "")))
+        txt_ly.insert("1.0", str(current_data.get("luu_y", "")))
+        ent_img.insert(0, str(current_data.get("hinh_anh", "")))
 
     # Thông báo lỗi
     lbl_err = tk.Label(main, text="", font=("Segoe UI", 9),
                        bg=COLOR_BG, fg=COLOR_DANGER)
-    lbl_err.grid(row=10, column=0, sticky="w", pady=(4, 0))
+    lbl_err.grid(row=16, column=0, sticky="w", pady=(4, 0))
 
     def on_luu():
         ten = ent_ten.get().strip()
@@ -395,6 +406,9 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
         nl = txt_nl.get("1.0", tk.END).strip()
         dl = txt_dl.get("1.0", tk.END).strip()
         tg_str = ent_tg.get().strip()
+        cl = txt_cl.get("1.0", tk.END).strip()
+        ly = txt_ly.get("1.0", tk.END).strip()
+        img = ent_img.get().strip()
 
         if not ten:
             lbl_err.config(text="⚠ Mời bạn nhập Tên món ăn!")
@@ -430,12 +444,15 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
             "nguyen_lieu": nl,
             "dinh_luong": dl,
             "thoi_gian": tg,
+            "cach_lam": cl,
+            "luu_y": ly,
+            "hinh_anh": img,
         })
         top.destroy()
 
     # Buttons
     frame_btn = tk.Frame(main, bg=COLOR_BG)
-    frame_btn.grid(row=11, column=0, sticky="e", pady=(16, 0))
+    frame_btn.grid(row=17, column=0, sticky="e", pady=(16, 0))
 
     ttk.Button(frame_btn, text="💾 Lưu", style="Action.TButton",
                command=on_luu).pack(side=tk.LEFT, padx=6)
@@ -453,22 +470,240 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
     return result[0] if result else None
 
 
+# ─── Cửa sổ Chi tiết món ăn ──────────────────────────
+
+def hien_thi_chi_tiet(parent, data):
+    """Hiển thị cửa sổ xem chi tiết món ăn (hướng dẫn từng bước + lưu ý)."""
+    top = tk.Toplevel(parent)
+    top.title(f"📖 Chi tiết: {data.get('ten_mon', '')}")
+    top.configure(bg=COLOR_BG)
+    top.geometry("820x680")
+    top.minsize(640, 480)
+    top.grab_set()
+
+    # ── Container cuộn được ───────────────────────────
+    canvas = tk.Canvas(top, bg=COLOR_BG, highlightthickness=0)
+    scrollbar = ttk.Scrollbar(top, orient="vertical", command=canvas.yview)
+    main = tk.Frame(canvas, bg=COLOR_BG)
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    canvas_window = canvas.create_window((0, 0), window=main, anchor="nw")
+
+    def on_frame_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+    def on_canvas_configure(event):
+        canvas.itemconfig(canvas_window, width=event.width)
+    main.bind("<Configure>", on_frame_configure)
+    canvas.bind("<Configure>", on_canvas_configure)
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+    # ── Tên món ──────────────────────────────────────
+    tk.Label(main, text=data.get("ten_mon", ""),
+             font=("Segoe UI", 24, "bold"),
+             bg=COLOR_BG, fg=COLOR_ACCENT,
+             wraplength=760, justify="left").pack(anchor="w", padx=24, pady=(22, 4))
+
+    # Đường kẻ trang trí
+    sep_line = tk.Frame(main, bg=COLOR_ACCENT, height=3)
+    sep_line.pack(fill=tk.X, padx=24, pady=(0, 10))
+
+    # ── Badge thông tin ───────────────────────────────
+    f_badge = tk.Frame(main, bg=COLOR_BG)
+    f_badge.pack(anchor="w", padx=24, pady=(0, 8))
+    tk.Label(f_badge,
+             text=f"📂  {data.get('loai_mon', 'Khác')}",
+             font=("Segoe UI", 10, "bold"),
+             bg=COLOR_SURFACE, fg=COLOR_MUTED,
+             padx=12, pady=5).pack(side=tk.LEFT, padx=(0, 10))
+    tk.Label(f_badge,
+             text=f"⏱  {data.get('thoi_gian', 0)} phút chuẩn bị",
+             font=("Segoe UI", 10, "bold"),
+             bg=COLOR_SURFACE, fg=COLOR_MUTED,
+             padx=12, pady=5).pack(side=tk.LEFT, padx=(0, 10))
+    # Badge số khẩu phần ước tính (dựa trên định lượng nếu có)
+    tk.Label(f_badge,
+             text="👥  Cho ~2–4 người",
+             font=("Segoe UI", 10, "bold"),
+             bg=COLOR_SURFACE, fg=COLOR_MUTED,
+             padx=12, pady=5).pack(side=tk.LEFT)
+
+    # ── Nguyên liệu & Định lượng ─────────────────────
+    tk.Label(main, text="🥬  Nguyên liệu & Định lượng",
+             font=("Segoe UI", 15, "bold"),
+             bg=COLOR_BG, fg=COLOR_ACCENT2).pack(anchor="w", padx=24, pady=(18, 6))
+
+    nl_raw = str(data.get("nguyen_lieu", "")).strip()
+    dl_raw = str(data.get("dinh_luong", "")).strip()
+    nl_items = [s.strip() for s in nl_raw.split("|") if s.strip()] if nl_raw else []
+    dl_items = [s.strip() for s in dl_raw.split("|") if s.strip()] if dl_raw else []
+
+    if nl_items:
+        # Container nguyên liệu
+        ing_container = tk.Frame(main, bg=COLOR_PANEL,
+                                  highlightbackground=COLOR_BORDER,
+                                  highlightthickness=1)
+        ing_container.pack(fill=tk.X, padx=24, pady=(0, 4))
+
+        # Header bảng
+        header_f = tk.Frame(ing_container, bg=COLOR_SURFACE)
+        header_f.pack(fill=tk.X)
+        tk.Label(header_f, text="  #",
+                 font=("Segoe UI", 10, "bold"),
+                 bg=COLOR_SURFACE, fg=COLOR_MUTED,
+                 width=4, anchor="center").pack(side=tk.LEFT, padx=(4, 0))
+        tk.Label(header_f, text="Nguyên liệu",
+                 font=("Segoe UI", 10, "bold"),
+                 bg=COLOR_SURFACE, fg=COLOR_MUTED,
+                 anchor="w").pack(side=tk.LEFT, fill=tk.X, expand=True, padx=12)
+        tk.Label(header_f, text="Định lượng",
+                 font=("Segoe UI", 10, "bold"),
+                 bg=COLOR_SURFACE, fg=COLOR_MUTED,
+                 width=18, anchor="center").pack(side=tk.RIGHT, padx=12)
+
+        for i, nl in enumerate(nl_items):
+            dl = dl_items[i] if i < len(dl_items) else "—"
+            row_bg = COLOR_ROW_ODD if i % 2 == 0 else COLOR_ROW_EVEN
+            row_f = tk.Frame(ing_container, bg=row_bg)
+            row_f.pack(fill=tk.X)
+            tk.Label(row_f, text=str(i + 1),
+                     font=("Segoe UI", 10),
+                     bg=row_bg, fg=COLOR_MUTED,
+                     width=4, anchor="center").pack(side=tk.LEFT, padx=(4, 0))
+            tk.Label(row_f, text=nl,
+                     font=("Segoe UI", 10),
+                     bg=row_bg, fg=COLOR_TEXT,
+                     anchor="w").pack(side=tk.LEFT, fill=tk.X, expand=True, padx=12, pady=4)
+            tk.Label(row_f, text=dl,
+                     font=("Segoe UI", 10, "bold"),
+                     bg=row_bg, fg=COLOR_ACCENT2,
+                     width=18, anchor="center").pack(side=tk.RIGHT, padx=12, pady=4)
+    else:
+        tk.Label(main, text="Chưa có thông tin nguyên liệu.",
+                 font=("Segoe UI", 11, "italic"),
+                 bg=COLOR_BG, fg=COLOR_MUTED).pack(anchor="w", padx=34, pady=4)
+
+    # ── Hình ảnh (nếu có) ─────────────────────────────
+    img_path = str(data.get("hinh_anh", "")).strip()
+    if img_path and os.path.exists(img_path):
+        try:
+            img = Image.open(img_path)
+            img.thumbnail((500, 320))
+            photo = ImageTk.PhotoImage(img)
+            lbl_img = tk.Label(main, image=photo, bg=COLOR_BG)
+            lbl_img.image = photo
+            lbl_img.pack(anchor="w", padx=24, pady=10)
+        except Exception:
+            tk.Label(main, text="⚠ Không thể tải hình ảnh",
+                     fg=COLOR_DANGER, bg=COLOR_BG).pack(anchor="w", padx=24)
+
+    # ── Hướng dẫn thực hiện ───────────────────────────
+    tk.Label(main, text="🍳  Hướng dẫn thực hiện",
+             font=("Segoe UI", 15, "bold"),
+             bg=COLOR_BG, fg=COLOR_TEXT).pack(anchor="w", padx=24, pady=(18, 6))
+
+    cach_lam_raw = str(data.get("cach_lam", "")).strip()
+
+    # Tách từng bước (mỗi dòng = 1 bước)
+    step_lines = [s.strip() for s in cach_lam_raw.splitlines() if s.strip()]
+
+    if not step_lines and not cach_lam_raw:
+        tk.Label(main,
+                 text="Chưa có hướng dẫn cụ thể.",
+                 font=("Segoe UI", 11, "italic"),
+                 bg=COLOR_BG, fg=COLOR_MUTED).pack(anchor="w", padx=34, pady=4)
+    else:
+        lines_to_show = step_lines if step_lines else [cach_lam_raw]
+        step_num = 0
+        for line in lines_to_show:
+            # Bỏ tiền tố số bước cũ nếu người dùng đã tự đánh (vd: "1.", "Bước 1:")
+            import re
+            clean = re.sub(r'^(bước\s*\d+[:\.]?|\d+[:\.])\s*', '', line, flags=re.IGNORECASE).strip()
+            if not clean:
+                continue
+            step_num += 1
+
+            # Card mỗi bước
+            card = tk.Frame(main, bg=COLOR_PANEL,
+                            highlightbackground=COLOR_BORDER,
+                            highlightthickness=1)
+            card.pack(fill=tk.X, padx=24, pady=4)
+
+            # Số bước – hình tròn màu accent
+            badge_frame = tk.Frame(card, bg=COLOR_ACCENT, width=34, height=34)
+            badge_frame.pack(side=tk.LEFT, padx=(12, 0), pady=10)
+            badge_frame.pack_propagate(False)
+            tk.Label(badge_frame, text=str(step_num),
+                     font=("Segoe UI", 11, "bold"),
+                     bg=COLOR_ACCENT, fg="#fff").place(relx=0.5, rely=0.5, anchor="center")
+
+            # Nội dung bước
+            tk.Label(card, text=clean,
+                     font=("Segoe UI", 11),
+                     bg=COLOR_PANEL, fg=COLOR_TEXT,
+                     justify="left", wraplength=680,
+                     anchor="w").pack(side=tk.LEFT, padx=14, pady=10, fill=tk.X, expand=True)
+
+    # ── Lưu ý khi nấu (từ cột luu_y trong DB) ───────────────────────
+    tk.Label(main, text="💡  Lưu ý khi nấu",
+             font=("Segoe UI", 15, "bold"),
+             bg=COLOR_BG, fg=COLOR_WARN).pack(anchor="w", padx=24, pady=(22, 6))
+
+    note_panel = tk.Frame(main, bg="#2D2B1A",
+                          highlightbackground=COLOR_WARN,
+                          highlightthickness=1)
+    note_panel.pack(fill=tk.X, padx=24, pady=(0, 16))
+
+    luu_y_raw = str(data.get("luu_y", "")).strip()
+    luu_y_lines = [s.strip() for s in luu_y_raw.splitlines() if s.strip()]
+
+    if luu_y_lines:
+        for note in luu_y_lines:
+            tk.Label(note_panel,
+                     text=f"⚠  {note}",
+                     font=("Segoe UI", 11),
+                     bg="#2D2B1A", fg=COLOR_WARN,
+                     justify="left", wraplength=710,
+                     anchor="w").pack(anchor="w", padx=16, pady=5)
+    else:
+        # Lưu ý mặc định khi chưa có dữ liệu
+        default_notes = [
+            "Nên chuẩn bị đầy đủ nguyên liệu và dụng cụ trước khi bắt đầu nấu.",
+            "Điều chỉnh gia vị theo khẩu vị của gia đình (mặn, nhạt, cay).",
+            "Kiểm tra độ chín của thức ăn kỹ lưỡng trước khi dùng.",
+            "Các nguyên liệu tươi sống cần được rửa sạch và để ráo nước.",
+        ]
+        for note in default_notes:
+            tk.Label(note_panel,
+                     text=f"▸  {note}",
+                     font=("Segoe UI", 10),
+                     bg="#2D2B1A", fg=COLOR_WARN,
+                     justify="left", wraplength=710,
+                     anchor="w").pack(anchor="w", padx=16, pady=3)
+
+    tk.Label(main, text="", bg=COLOR_BG).pack(pady=8)
+
+    def _on_destroy(event):
+        if event.widget == top:
+            canvas.unbind_all("<MouseWheel>")
+    top.bind("<Destroy>", _on_destroy)
+
+
 # ─── Cửa sổ Thống kê ─────────────────────────────────
 
 def hien_thi_thong_ke(parent, stats):
-    """Hiển thị cửa sổ thống kê chi tiết."""
+    """Hiển thị cửa sổ thống kê chi tiết với biểu đồ matplotlib."""
     top = tk.Toplevel(parent)
     top.title("📊 Thống kê Công thức Nấu ăn")
     top.configure(bg=COLOR_BG)
     
-    # Cho phép resize, định nghĩa kích thước tối đa/tối thiểu
+    # Cho phép resize, định nghĩa kích thước
     top.resizable(True, True)
-    top.minsize(400, 300)
+    top.minsize(850, 650)
     
-    # Lấy kích thước màn hình để không vượt quá chiều cao màn hình
-    screen_height = top.winfo_screenheight()
-    max_height = int(screen_height * 0.8)
-
     top.grab_set()
 
     tk.Label(top,
@@ -482,128 +717,96 @@ def hien_thi_thong_ke(parent, stats):
                  bg=COLOR_BG, fg=COLOR_MUTED).pack(pady=30, padx=30)
         ttk.Button(top, text="Đóng", style="Neutral.TButton",
                    command=top.destroy).pack(pady=10)
-        top.update_idletasks()
-        pw, ph = parent.winfo_width(), parent.winfo_height()
-        px, py = parent.winfo_x(), parent.winfo_y()
-        tw, th = top.winfo_reqwidth(), top.winfo_reqheight()
-        top.geometry(f"+{px + (pw - tw)//2}+{py + (ph - th)//2}")
         return
 
-    # Frame chính chứa Canvas và Scrollbar
+    # Frame chính chứa Canvas và Label tổng quan
     container = tk.Frame(top, bg=COLOR_BG)
     container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-    # Canvas
-    canvas = tk.Canvas(container, bg=COLOR_BG, highlightthickness=0)
-    
-    # Scrollbar
-    scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
-    
-    # Frame chứa nội dung (bên trong canvas)
-    main = tk.Frame(canvas, bg=COLOR_BG)
+    # Frame hiển thị dạng số (Tổng quan)
+    frame_text = tk.Frame(container, bg=COLOR_BG)
+    frame_text.pack(fill=tk.X, pady=(0, 15))
 
-    # Cấu hình canvas
-    canvas.configure(yscrollcommand=scrollbar.set)
-    
-    # Pack canvas và scrollbar
-    scrollbar.pack(side="right", fill="y")
-    canvas.pack(side="left", fill="both", expand=True)
-
-    # Hàm xử lý khi nội dung main thay đổi
-    def on_frame_configure(event):
-        canvas.configure(scrollregion=canvas.bbox("all"))
-
-    main.bind("<Configure>", on_frame_configure)
-
-    # Hàm xử lý để frame nội dung luôn rộng bằng canvas
-    def on_canvas_configure(event):
-        canvas.itemconfig(canvas_window, width=event.width)
-
-    canvas.bind("<Configure>", on_canvas_configure)
-
-    # Đưa frame main vào canvas
-    canvas_window = canvas.create_window((0, 0), window=main, anchor="nw")
-
-    # Cho phép cuộn bằng con lăn chuột
-    def _on_mousewheel(event):
-        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-    canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
-
-    def section(txt):
-        tk.Label(main, text=txt,
-                 font=("Segoe UI", 11, "bold"),
-                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", pady=(12, 4))
-
-    def kv(k, v):
-        f = tk.Frame(main, bg=COLOR_SURFACE, padx=10, pady=6)
-        f.pack(fill=tk.X, pady=2)
+    def kv(parent_frame, k, v):
+        f = tk.Frame(parent_frame, bg=COLOR_SURFACE, padx=10, pady=8)
+        f.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         tk.Label(f, text=k, font=("Segoe UI", 9), bg=COLOR_SURFACE,
-                 fg=COLOR_MUTED, width=32, anchor="w").pack(side=tk.LEFT)
-        tk.Label(f, text=str(v), font=("Segoe UI", 10, "bold"),
-                 bg=COLOR_SURFACE, fg=COLOR_TEXT).pack(side=tk.LEFT)
+                 fg=COLOR_MUTED).pack(anchor="w")
+        tk.Label(f, text=str(v), font=("Segoe UI", 12, "bold"),
+                 bg=COLOR_SURFACE, fg=COLOR_TEXT).pack(anchor="w")
 
-    section("Tổng quan")
-    kv("Tổng số công thức:", stats.get("tong_ct", 0))
-    kv("Thời gian TB (tất cả):", f"{stats.get('tg_trung_binh', 0):.1f} phút")
-    kv("Thời gian ngắn nhất:", f"{stats.get('tg_min', 0)} phút")
-    kv("Thời gian dài nhất:", f"{stats.get('tg_max', 0)} phút")
+    kv(frame_text, "Tổng số công thức:", stats.get("tong_ct", 0))
+    kv(frame_text, "Thời gian TB:", f"{stats.get('tg_trung_binh', 0):.1f} phút")
+    kv(frame_text, "Nhanh nhất:", f"{stats.get('tg_min', 0)} phút")
+    kv(frame_text, "Lâu nhất:", f"{stats.get('tg_max', 0)} phút")
 
-    section("⏱  Thời gian chuẩn bị trung bình theo Loại món")
+    # Tạo biểu đồ với Matplotlib
+    plt.style.use("dark_background")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), facecolor=COLOR_BG)
+    fig.subplots_adjust(bottom=0.2, wspace=0.3)
+
+    # Biểu đồ 1: Thời gian trung bình theo loại món (Bar chart)
     tg_loai = stats.get("tg_theo_loai", {})
     if tg_loai:
-        for loai, tg in sorted(tg_loai.items(), key=lambda x: -x[1]):
-            kv(f"  {loai}:", f"{tg:.1f} phút")
+        labels1 = list(tg_loai.keys())
+        values1 = list(tg_loai.values())
+        bars = ax1.bar(labels1, values1, color=COLOR_ACCENT)
+        ax1.set_title("TG Chuẩn bị TB theo Loại (phút)", color=COLOR_TEXT, pad=10)
+        ax1.tick_params(axis='x', rotation=45, colors=COLOR_MUTED)
+        ax1.tick_params(axis='y', colors=COLOR_MUTED)
+        ax1.set_facecolor(COLOR_SURFACE)
+        ax1.grid(axis='y', linestyle='--', alpha=0.3)
+        # Thêm text giá trị lên cột
+        for bar in bars:
+            height = bar.get_height()
+            ax1.annotate(f'{height:.1f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom', color=COLOR_TEXT, fontsize=9)
     else:
-        tk.Label(main, text="  (Không có dữ liệu)",
-                 bg=COLOR_BG, fg=COLOR_MUTED,
-                 font=("Segoe UI", 9, "italic")).pack(anchor="w")
+        ax1.text(0.5, 0.5, "Không có dữ liệu", ha='center', va='center')
+        ax1.set_title("TG Chuẩn bị TB theo Loại")
 
-    section("🧄  Top nguyên liệu được dùng nhiều nhất")
+    # Biểu đồ 2: Top nguyên liệu (Pie chart)
     top_nl = stats.get("top_nguyen_lieu", {})
     if top_nl:
-        for i, (nl, cnt) in enumerate(list(top_nl.items())[:10], 1):
-            kv(f"  #{i}  {nl}:", f"{cnt} lần")
+        labels2 = list(top_nl.keys())[:7]  # Lấy top 7
+        values2 = list(top_nl.values())[:7]
+        wedges, texts, autotexts = ax2.pie(values2, labels=labels2, autopct='%1.1f%%',
+                                           startangle=90, textprops=dict(color=COLOR_TEXT),
+                                           colors=plt.cm.viridis(np.linspace(0.2, 0.9, len(labels2))))
+        ax2.set_title("Top 7 Nguyên liệu phổ biến", color=COLOR_TEXT, pad=10)
     else:
-        tk.Label(main, text="  (Không có dữ liệu)",
-                 bg=COLOR_BG, fg=COLOR_MUTED,
-                 font=("Segoe UI", 9, "italic")).pack(anchor="w")
+        ax2.text(0.5, 0.5, "Không có dữ liệu", ha='center', va='center')
+        ax2.set_title("Top Nguyên liệu phổ biến")
+
+    # Đưa Figure vào Tkinter
+    canvas = FigureCanvasTkAgg(fig, master=container)
+    canvas_widget = canvas.get_tk_widget()
+    canvas_widget.pack(fill=tk.BOTH, expand=True)
 
     # Nút đóng đặt ngoài canvas, ở dưới cùng của cửa sổ popup
     frame_btn = tk.Frame(top, bg=COLOR_BG)
-    frame_btn.pack(fill=tk.X, pady=(0, 10))
+    frame_btn.pack(fill=tk.X, pady=(10, 10))
     
     ttk.Button(frame_btn, text="Đóng", style="Neutral.TButton",
                command=top.destroy).pack()
 
+    # Canh giữa màn hình
     top.update_idletasks()
-    
-    # Tính toán kích thước
-    req_width = top.winfo_reqwidth()
-    req_height = top.winfo_reqheight()
-    
-    # Đặt giới hạn chiều cao
-    if req_height > max_height:
-        req_height = max_height
-    
-    # Giữ chiều rộng nhỏ nhất là 450
-    if req_width < 450:
-         req_width = 450
-
     pw, ph = parent.winfo_width(), parent.winfo_height()
     px, py = parent.winfo_x(), parent.winfo_y()
+    tw, th = top.winfo_reqwidth(), top.winfo_reqheight()
     
-    # Căn giữa
-    x = px + (pw - req_width) // 2
-    y = py + (ph - req_height) // 2
-    
-    top.geometry(f"{req_width}x{req_height}+{x}+{y}")
-    
-    # Xóa binding chuột khi đóng cửa sổ
+    x = px + (pw - tw) // 2
+    y = py + (ph - th) // 2
+    top.geometry(f"+{x}+{y}")
+
+    # Xóa memory khi đóng cửa sổ
     def _on_destroy(event):
         if event.widget == top:
-             canvas.unbind_all("<MouseWheel>")
+            plt.close(fig)
              
     top.bind("<Destroy>", _on_destroy)
 

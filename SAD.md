@@ -3,7 +3,7 @@
 
 > **Môn học**: Lập trình Python – BTL 2026-1  
 > **Nhóm**: Nhóm 3 · **Trường**: Đại học Hạ Long (UHL)  
-> **Phiên bản**: 1.0.0 · **Ngày**: 10/05/2026
+> **Phiên bản**: 2.0.0 · **Ngày**: 17/05/2026
 
 ---
 
@@ -42,8 +42,8 @@ Tài liệu này mô tả kiến trúc tổng thể của ứng dụng **Quản 
            ▼                             │
 ┌──────────────────────┐                 │
 │  MODEL (congthuc.py) │─────────────────┘
-│  • Đọc / Ghi CSV     │
-│  • CRUD DataFrame    │
+│  • CRUD SQLite DB    │
+│  • Trả về DataFrame  │
 │  • Thống kê numpy    │
 │  • Không biết về UI  │
 └──────────┬───────────┘
@@ -51,7 +51,8 @@ Tài liệu này mô tả kiến trúc tổng thể của ứng dụng **Quản 
            ▼
 ┌──────────────────────┐
 │   DATA SOURCE        │
-│   data/congthuc.csv  │
+│   data/congthuc.db   │
+│   (SQLite3)          │
 └──────────────────────┘
 ```
 
@@ -59,11 +60,11 @@ Tài liệu này mô tả kiến trúc tổng thể của ứng dụng **Quản 
 
 | Tầng | File | Nhiệm vụ |
 |------|------|----------|
-| **Model** | `models/congthuc.py` | CRUD dữ liệu CSV; tính toán thống kê bằng `pandas` và `numpy` |
+| **Model** | `models/congthuc.py` | CRUD dữ liệu SQLite3; trả về DataFrame; tính toán thống kê bằng `pandas` và `numpy` |
 | **View** | `views/gui_view_congthuc.py` | Xây dựng và hiển thị toàn bộ widget Tkinter; không chứa logic nghiệp vụ |
 | **Controller** | `controllers/gui_controller_congthuc.py` | Bắt sự kiện từ View, validate, gọi Model, cập nhật lại View |
 | **Utility** | `utils/logger.py` | Ghi log DEBUG/INFO/ERROR ra file `data/app.log` |
-| **Entry Point** | `main.py` | Phân nhánh chế độ chạy (GUI công thức / GUI diemdanh / CLI) |
+| **Entry Point** | `main.py` | Khởi động ứng dụng GUI |
 
 ---
 
@@ -72,31 +73,25 @@ Tài liệu này mô tả kiến trúc tổng thể của ứng dụng **Quản 
 ```
 ltpt-btl-20261-nhom-3/
 ├── data/
-│   ├── congthuc.csv                # Data Source chính (tự tạo nếu chưa có)
-│   ├── diemdanh.csv                # Data Source gốc (SmartAttend)
+│   ├── congthuc.db                 # SQLite Database chính (tự tạo khi chạy lần đầu)
 │   └── app.log                     # File log tự động
 │
 ├── models/
-│   ├── congthuc.py                 # Model: CRUD công thức + thống kê numpy/pandas
-│   └── diemdanh.py                 # Model: Điểm danh (gốc)
+│   └── congthuc.py                 # Model: CRUD công thức (SQLite3) + thống kê numpy/pandas
 │
 ├── views/
-│   ├── gui_view_congthuc.py        # View: Dark UI – Main window + form popup + thống kê
-│   ├── gui_view.py                 # View: SmartAttend GUI (gốc)
-│   └── cli_view.py                 # View: Dòng lệnh (gốc)
+│   └── gui_view_congthuc.py        # View: Dark UI – Main window + form popup + thống kê
 │
 ├── controllers/
-│   ├── gui_controller_congthuc.py  # Controller: kết nối View ↔ Model công thức
-│   ├── gui_controller.py           # Controller: SmartAttend (gốc)
-│   └── cli_controller.py           # Controller: CLI (gốc)
+│   └── gui_controller_congthuc.py  # Controller: kết nối View ↔ Model công thức
 │
 ├── utils/
 │   └── logger.py                   # Logging toàn ứng dụng
 │
 ├── assets/                         # Icon .ico
-├── templates/                      # Template CSV mẫu
 ├── tests/                          # Unit Test
-└── main.py                         # Entry Point
+├── main.py                         # Entry Point (GUI)
+└── main_cli.py                     # Entry Point (CLI)
 ```
 
 ---
@@ -109,20 +104,19 @@ ltpt-btl-20261-nhom-3/
 
 | Hằng | Giá trị | Mục đích |
 |------|---------|----------|
-| `FILE_CONGTHUC` | `data/congthuc.csv` | Đường dẫn file CSV |
+| `FILE_DB` | `data/congthuc.db` | Đường dẫn file SQLite Database |
 | `LOAI_MON_LIST` | `["Khai vị", "Món chính", ...]` | Danh mục loại món |
-| `COLS_CSV` | `["ten_mon", "loai_mon", ...]` | Thứ tự cột CSV |
+| `COLS_DB` | `["ten_mon", "loai_mon", ..., "luu_y"]` | Thứ tự cột trả về |
 
 **Các hàm công khai**
 
 | Hàm | Tham số | Trả về | Mô tả |
 |-----|---------|--------|-------|
-| `khoi_tao_csv()` | — | — | Tạo file CSV rỗng nếu chưa tồn tại |
-| `lay_danh_sach()` | — | `(DataFrame, bool)` | Đọc CSV, ép kiểu, trả về df |
-| `luu_danh_sach(df)` | df | `bool` | Ghi df xuống CSV |
-| `them_cong_thuc(df, data)` | df, dict | `(df, bool, str)` | Thêm hàng mới vào df + lưu |
-| `sua_cong_thuc(df, old_ten, data)` | df, str, dict | `(df, bool, str)` | Cập nhật hàng + lưu |
-| `xoa_cong_thuc(df, ten_list)` | df, list | `(df, bool, str)` | Xoá nhiều hàng + lưu |
+| `khoi_tao_db()` | — | — | Tạo DB + bảng nếu chưa có; auto-migrate CSV cũ |
+| `lay_danh_sach()` | — | `(DataFrame, bool)` | Đọc từ SQLite, trả về df |
+| `them_cong_thuc(df, data)` | df, dict | `(df, bool, str)` | INSERT vào DB |
+| `sua_cong_thuc(df, old_ten, data)` | df, str, dict | `(df, bool, str)` | UPDATE trong DB |
+| `xoa_cong_thuc(df, ten_list)` | df, list | `(df, bool, str)` | DELETE nhiều hàng khỏi DB |
 | `thong_ke(df)` | df | `dict` | Thống kê tổng quan + numpy |
 
 **Quy ước trả về của CRUD:**  
@@ -191,8 +185,9 @@ top_nl = nl_series.value_counts().head(10)
 | `tao_giao_dien_chinh(root)` | Khởi tạo toàn bộ layout, trả về dict `ui` |
 | `hien_thi_bang(ui, df)` | Xóa và render lại Treeview từ DataFrame |
 | `cap_nhat_status(ui, stats)` | Cập nhật thanh trạng thái phía dưới |
-| `hien_thi_form(parent, is_edit, current_data)` | Popup Thêm/Sửa, trả về dict hoặc None |
-| `hien_thi_thong_ke(parent, stats)` | Popup thống kê chi tiết |
+| `hien_thi_form(parent, is_edit, current_data)` | Popup Thêm/Sửa (gồm cả ô Lưu ý), trả về dict hoặc None |
+| `hien_thi_chi_tiet(parent, data)` | Popup chi tiết từng bước + lưu ý riêng theo món |
+| `hien_thi_thong_ke(parent, stats)` | Popup thống kê chi tiết (biểu đồ matplotlib) |
 
 ---
 
@@ -243,7 +238,7 @@ Controller nhận dict data
        ▼
 Model.them_cong_thuc(app_df, data)
        │  kiểm tra trùng tên
-       │  pd.concat → luu_danh_sach (ghi CSV)
+       │  SQLite INSERT INTO congthuc
        │  trả về (df_mới, True, "Thêm thành công!")
        ▼
 Controller._tai_du_lieu()
@@ -279,12 +274,14 @@ View.hien_thi_thong_ke(parent, stats)
 
 | Công nghệ | Phiên bản | Mục đích |
 |-----------|-----------|----------|
-| **Python** | 3.9+ | Ngôn ngữ lập trình chính |
-| **pandas** | ≥ 1.3 | Quản lý DataFrame, đọc/ghi CSV, `value_counts()` |
+| **Python** | 3.10+ | Ngôn ngữ lập trình chính |
+| **sqlite3** | stdlib | Lưu trữ dữ liệu bền vững (thay thế CSV) |
+| **pandas** | ≥ 1.3 | Quản lý DataFrame trả về từ SQLite, `value_counts()` |
 | **numpy** | ≥ 1.21 | Tính toán thống kê vectorized (`mean`, `max`, `min`) |
 | **tkinter** | stdlib | Giao diện đồ hoạ Desktop (Treeview, Toplevel, ttk) |
+| **matplotlib** | ≥ 3.5 | Biểu đồ thống kê (Bar chart, Pie chart) |
+| **Pillow** | ≥ 9.0 | Hiển thị hình ảnh món ăn trong cửa sổ chi tiết |
 | **logging** | stdlib | Ghi log ứng dụng ra `data/app.log` |
-| **pyinstaller** | ≥ 5.0 | Đóng gói thành file `.exe` độc lập |
 | **unittest** | stdlib | Kiểm thử tự động |
 
 ---
@@ -294,8 +291,9 @@ View.hien_thi_thong_ke(parent, stats)
 | Quyết định | Lý do |
 |-----------|-------|
 | **Module-level state** thay vì class | Đơn giản hơn, phù hợp với sinh viên học Python cơ bản, nhất quán với codebase gốc |
-| **CSV** làm Data Source | Không cần cài đặt database; dễ mở/kiểm tra bằng Excel |
+| **SQLite3** làm Data Source | Dữ liệu bền vững, hỗ trợ UNIQUE constraint, dễ mở rộng cột mới, tự migrate CSV cũ |
 | **pandas + numpy** bắt buộc | Minh họa xử lý dữ liệu dạng bảng và tính toán vectorized theo yêu cầu môn học |
-| **Nguyên liệu lưu chuỗi `\|`** | Tránh nested CSV; đủ đơn giản để parse, split và thống kê |
+| **Nguyên liệu lưu chuỗi `\|`** | Tránh bảng phụ; đủ đơn giản để parse, split và thống kê |
+| **Cột `luu_y` riêng biệt** | Tách biệt lưu ý khỏi cách làm giúp hiển thị và chỉnh sửa độc lập |
 | **Validation trong Controller** (không trong View) | Controller là lớp trung gian phù hợp nhất; View chỉ hiển thị |
 | **Tuple `(df, bool, msg)`** làm return của Model | Nhất quán, Controller dễ xử lý phân nhánh success/error |

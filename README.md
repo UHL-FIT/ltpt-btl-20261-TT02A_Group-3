@@ -3,7 +3,7 @@
 
 # 🍳 Quản Lý Công Thức Nấu Ăn – Nhóm 3
 
-Ứng dụng Python Desktop giúp lưu trữ, tìm kiếm và phân tích các công thức nấu ăn một cách trực quan và hiệu quả. Dữ liệu được lưu dưới dạng file CSV, xử lý bằng `pandas` và `numpy`.
+Ứng dụng Python Desktop giúp lưu trữ, tìm kiếm và phân tích các công thức nấu ăn một cách trực quan và hiệu quả. Dữ liệu được lưu trong **SQLite Database**, xử lý bằng `pandas` và `numpy`, giao diện xây dựng bằng `Tkinter`.
 
 > **Môn học**: Lập trình Python – BTL 2026-1 · **Nhóm**: Nhóm 3 · **Trường**: Đại học Hạ Long (UHL)
 
@@ -13,13 +13,14 @@
 
 | # | Tính năng | Mô tả |
 |---|-----------|-------|
-| 1 | **Quản lý Công thức** | Thêm, Sửa, Xoá công thức với đầy đủ thông tin: Tên, Loại món, Nguyên liệu, Định lượng, Thời gian chuẩn bị |
+| 1 | **Quản lý Công thức** | Thêm, Sửa, Xoá công thức với đầy đủ thông tin: Tên, Loại món, Nguyên liệu, Định lượng, Thời gian chuẩn bị, Cách làm, Lưu ý |
 | 2 | **Tìm kiếm & Lọc** | Tìm kiếm toàn văn kết hợp lọc nhanh theo Loại món ăn |
 | 3 | **Sắp xếp** | Click tiêu đề cột để sắp xếp tăng/giảm |
-| 4 | **Import / Export CSV** | Nhập/xuất dữ liệu hàng loạt qua file `.csv` |
-| 5 | **Thống kê (numpy)** | Thời gian chuẩn bị trung bình theo từng loại món; top nguyên liệu dùng nhiều nhất |
+| 4 | **Chi tiết từng bước** | Cửa sổ chi tiết hiển thị hướng dẫn nấu ăn theo từng bước có đánh số, kèm lưu ý riêng cho từng món |
+| 5 | **Thống kê (numpy)** | Thời gian chuẩn bị trung bình theo từng loại món; top nguyên liệu dùng nhiều nhất (biểu đồ matplotlib) |
 | 6 | **Validation** | Kiểm tra đầy đủ các trường bắt buộc, kiểu dữ liệu; hiển thị thông báo rõ ràng |
 | 7 | **Dark UI** | Giao diện tối hiện đại, auto resize, hài hoà trên mọi kích thước cửa sổ |
+| 8 | **SQLite Backend** | Lưu trữ dữ liệu bền vững bằng SQLite3, tự động tạo DB và migrate khi khởi động |
 
 ---
 
@@ -29,57 +30,97 @@
 ltpt-btl-20261-nhom-3/
 ├── assets/                         # Icon và tài nguyên ảnh
 ├── controllers/
-│   ├── gui_controller_congthuc.py  # Controller GUI – Công thức Nấu ăn (MÔN HỌC)
+│   └── gui_controller_congthuc.py  # Controller GUI – Công thức Nấu ăn
 ├── data/
-│   ├── congthuc.csv                # Dữ liệu công thức nấu ăn
+│   ├── congthuc.db                 # SQLite Database (tự động tạo khi chạy lần đầu)
+│   └── app.log                     # File log ứng dụng
 ├── models/
-│   ├── congthuc.py                 # Model – Công thức Nấu ăn (pandas + numpy)
+│   └── congthuc.py                 # Model – Công thức Nấu ăn (SQLite3 + pandas + numpy)
 ├── views/
-│   ├── gui_view_congthuc.py        # View – Giao diện Công thức Nấu ăn
+│   └── gui_view_congthuc.py        # View – Giao diện Công thức Nấu ăn (Tkinter)
 ├── utils/
 │   └── logger.py                   # Tiện ích ghi log
+├── tests/
+│   └── test_congthuc.py            # Unit Test cho Model
 ├── main.py                         # Entry Point (mặc định: Công thức Nấu ăn)
+├── main_cli.py                     # Entry Point CLI
 ├── requirements.txt                # Thư viện phụ thuộc
 ├── README.md                       # Tài liệu hướng dẫn tổng quan
 ├── SRS.md                          # Đặc tả Yêu cầu Hệ thống
 ├── SAD.md                          # Thiết kế Kiến trúc Phần mềm
 ├── CONVENTIONS.md                  # Quy chuẩn viết code & commit
 ├── setup_env.bat                   # Tạo môi trường ảo & cài thư viện
-├── build.bat                       # Đóng gói thành file .exe
-├── clean.bat                       # Dọn dẹp file rác sau build
 └── run_tests.bat                   # Chạy toàn bộ Unit Test
 ```
 
 ---
 
+## 🗄️ Cấu trúc Database
+
+Dữ liệu được lưu trong file `data/congthuc.db` (SQLite3) với bảng `congthuc`:
+
+| Cột | Kiểu | Bắt buộc | Mô tả |
+|-----|------|----------|-------|
+| `id` | INTEGER | ✅ | Khoá chính tự tăng |
+| `ten_mon` | TEXT | ✅ | Tên món ăn (phải duy nhất) |
+| `loai_mon` | TEXT | ✅ | Khai vị / Món chính / Tráng miệng / Đồ uống / Khác |
+| `nguyen_lieu` | TEXT | | Các nguyên liệu, ngăn cách bằng dấu `\|` |
+| `dinh_luong` | TEXT | | Định lượng tương ứng, ngăn cách bằng dấu `\|` |
+| `thoi_gian` | INTEGER | ✅ | Thời gian chuẩn bị (phút) |
+| `cach_lam` | TEXT | | Hướng dẫn nấu ăn, mỗi bước một dòng |
+| `hinh_anh` | TEXT | | Đường dẫn tuyệt đối tới file ảnh |
+| `luu_y` | TEXT | | Lưu ý khi nấu, đặc thù cho từng món (mỗi ý một dòng) |
+
+> **Lưu ý:** Database được tạo tự động khi chạy lần đầu. Nếu có file `congthuc.csv` cũ trong thư mục `data/`, ứng dụng sẽ tự động migrate dữ liệu sang DB.
+
+---
+
 ## 🚀 Hướng dẫn chạy ứng dụng
 
-*Lưu ý: Yêu cầu môi trường Python đã được kích hoạt.*
+> Yêu cầu: Python 3.10+ và môi trường ảo đã được kích hoạt.
 
-**Quản lý Công thức Nấu ăn (GUI – Mặc định)**
+**Bước 1 – Cài đặt môi trường (chỉ làm 1 lần)**
+```bash
+setup_env.bat
+```
+
+**Bước 2 – Chạy ứng dụng GUI (mặc định)**
 ```bash
 python main.py
 ```
 
-
-**Giao diện Dòng lệnh (CLI)**
+**Chạy giao diện dòng lệnh (CLI)**
 ```bash
-python main.py --cli
+python main_cli.py
+```
+
+**Chạy Unit Test**
+```bash
+run_tests.bat
+# hoặc
+python -m pytest tests/ -v
 ```
 
 ---
 
-## 📋 Định dạng file CSV import
+## 🍽️ Dữ liệu mẫu (10 món)
 
-File CSV phải có các cột sau (encoding UTF-8):
+Ứng dụng đi kèm **10 công thức nấu ăn** đại diện đủ các loại:
 
-| Cột | Kiểu | Bắt buộc | Mô tả |
-|-----|------|----------|-------|
-| `ten_mon` | text | ✅ | Tên món ăn (phải duy nhất) |
-| `loai_mon` | text | ✅ | Khai vị / Món chính / Tráng miệng / Đồ uống / Khác |
-| `nguyen_lieu` | text | | Các nguyên liệu, ngăn cách bằng dấu `\|` |
-| `dinh_luong` | text | | Định lượng tương ứng, ngăn cách bằng dấu `\|` |
-| `thoi_gian` | số nguyên | ✅ | Thời gian chuẩn bị (phút) |
+| # | Tên món | Loại |
+|---|---------|------|
+| 1 | Phở bò | Món chính |
+| 2 | Cơm chiên dương châu | Món chính |
+| 3 | Sinh tố bơ | Đồ uống |
+| 4 | Gỏi cuốn tôm thịt | Khai vị |
+| 5 | Bún bò Huế | Món chính |
+| 6 | Bánh flan | Tráng miệng |
+| 7 | Canh chua cá | Món chính |
+| 8 | Chả giò rán | Khai vị |
+| 9 | Gà nướng mật ong | Món chính |
+| 10 | Bánh chuối hấp | Tráng miệng |
+
+Mỗi món đi kèm hướng dẫn nấu chi tiết theo từng bước và **lưu ý nấu ăn riêng** phù hợp với đặc thù của món.
 
 ---
 
@@ -87,12 +128,12 @@ File CSV phải có các cột sau (encoding UTF-8):
 
 | Tên | Vai trò |
 |-----|---------|
-| Lê Mạnh Quân  | Người viết code |
-|Hoàng Văn Thịnh | Người thuyết trình |
-|Đào Mạnh Huy    | người làm báo cáo |
-|Ngô Hoàng Tuấn Tú |  |
+| Lê Mạnh Quân | Người viết code |
+| Hoàng Văn Thịnh | Người thuyết trình |
+| Đào Mạnh Huy | Người làm báo cáo |
+| Ngô Hoàng Tuấn Tú | |
 | **ThS. Vũ Duy Sơn** | Giảng viên hướng dẫn · vuduyson@daihochalong.edu.vn |
 
 ---
 
-*Phiên bản: 1.0.0 · Phát hành: 10/05/2026*
+*Phiên bản: 2.0.0 · Phát hành: 17/05/2026*

@@ -39,6 +39,8 @@ def _tai_du_lieu():
 
 def _apply_filter(df):
     """Lọc DataFrame theo từ khóa tìm kiếm và loại món."""
+    import unicodedata
+    
     if df is None or df.empty:
         return df
 
@@ -48,8 +50,25 @@ def _apply_filter(df):
 
     keyword = app_ui["ent_search"].get().strip().lower()
     if keyword:
-        mask = df.apply(
-            lambda r: r.astype(str).str.lower().str.contains(keyword).any(), axis=1)
+        # Hàm con hỗ trợ xóa dấu tiếng Việt và chữ 'đ'
+        def remove_accents(input_str):
+            if not isinstance(input_str, str):
+                input_str = str(input_str)
+            s = unicodedata.normalize('NFKD', input_str)
+            s = "".join([c for c in s if not unicodedata.combining(c)])
+            return s.replace('đ', 'd').replace('Đ', 'D')
+        
+        # Tách từ khóa để tìm kiếm thông minh (AND logic)
+        # VD: Gõ "ga nuong" -> Phải có cả "ga" và "nuong"
+        kw_parts = [remove_accents(k) for k in keyword.split()]
+        
+        def check_row(row):
+            # Gom tất cả các cột thành 1 chuỗi dài, xóa dấu và đưa về chữ thường
+            row_str = remove_accents(" ".join(row.astype(str)).lower())
+            # Kiểm tra xem TẤT CẢ các từ khóa có nằm trong chuỗi này không
+            return all(k in row_str for k in kw_parts)
+            
+        mask = df.apply(check_row, axis=1)
         df = df[mask]
 
     return df
@@ -141,55 +160,6 @@ def on_xoa():
             messagebox.showerror("Lỗi", msg)
 
 
-def on_import():
-    global app_df
-    logger.info("Import CSV.")
-    filepath = filedialog.askopenfilename(
-        title="Chọn file CSV công thức",
-        filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
-    if not filepath:
-        return
-    try:
-        df_import = pd.read_csv(filepath, dtype=str)
-        required = {"ten_mon", "loai_mon", "thoi_gian"}
-        if not required.issubset(df_import.columns):
-            messagebox.showerror("Lỗi",
-                f"File CSV phải có các cột: {', '.join(required)}")
-            return
-        count = 0
-        for _, row in df_import.iterrows():
-            data = {
-                "ten_mon":     row.get("ten_mon", ""),
-                "loai_mon":    row.get("loai_mon", "Khác"),
-                "nguyen_lieu": row.get("nguyen_lieu", ""),
-                "dinh_luong":  row.get("dinh_luong", ""),
-                "thoi_gian":   row.get("thoi_gian", 0),
-            }
-            app_df, ok, _ = model.them_cong_thuc(app_df, data)
-            if ok:
-                count += 1
-        _tai_du_lieu()
-        messagebox.showinfo("Thành công", f"Đã import {count} công thức từ file.")
-    except Exception as e:
-        messagebox.showerror("Lỗi", f"Không thể import: {e}")
-
-
-def on_export():
-    logger.info("Export CSV.")
-    filepath = filedialog.asksaveasfilename(
-        title="Lưu file CSV công thức",
-        defaultextension=".csv",
-        filetypes=[("CSV Files", "*.csv")],
-        initialfile="congthuc_export.csv")
-    if not filepath:
-        return
-    try:
-        app_df.to_csv(filepath, index=False, encoding="utf-8-sig")
-        messagebox.showinfo("Thành công", f"Đã lưu tại:\n{filepath}")
-    except Exception as e:
-        messagebox.showerror("Lỗi", f"Không thể lưu file: {e}")
-
-
 def on_thongke():
     logger.info("Mở cửa sổ thống kê.")
     stats = model.thong_ke(app_df)
@@ -241,22 +211,24 @@ def on_single_click(event):
 
 
 def on_double_click(event):
-    """Double-click vào dòng -> mở form sửa luôn."""
+    """Double-click vào dòng -> mở cửa sổ chi tiết món ăn."""
     tree = app_ui["tree"]
     if tree.identify_region(event.x, event.y) != "cell":
         return
     iid = tree.identify_row(event.y)
     if not iid:
         return
-    # Đánh dấu dòng được chọn rồi gọi on_sua
-    for i in tree.get_children():
-        vals = list(tree.item(i, "values"))
-        vals[0] = "☐"
-        tree.item(i, values=vals)
+    
     vals = list(tree.item(iid, "values"))
-    vals[0] = "☑"
-    tree.item(iid, values=vals)
-    on_sua()
+    ten_mon = vals[2]
+    
+    row = app_df[app_df["ten_mon"] == ten_mon]
+    if row.empty:
+        messagebox.showerror("Lỗi", "Không tìm thấy công thức!")
+        return
+        
+    current_data = row.iloc[0].to_dict()
+    view.hien_thi_chi_tiet(app_root, current_data)
 
 
 # ─── Bind events ─────────────────────────────────────
@@ -265,8 +237,6 @@ def _bind_events():
     app_ui["btn_them"].config(command=on_them)
     app_ui["btn_sua"].config(command=on_sua)
     app_ui["btn_xoa"].config(command=on_xoa)
-    app_ui["btn_import"].config(command=on_import)
-    app_ui["btn_export"].config(command=on_export)
     app_ui["btn_thongke"].config(command=on_thongke)
     app_ui["btn_about"].config(command=on_about)
     app_ui["btn_search"].config(command=on_search)
