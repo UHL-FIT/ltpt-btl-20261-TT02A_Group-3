@@ -16,30 +16,30 @@ import numpy as np
 from PIL import Image, ImageTk
 
 # ─── Màu sắc ─────────────────────────────────────────
-COLOR_BG        = "#1E1E2E"
-COLOR_SURFACE   = "#2A2A3E"
-COLOR_PANEL     = "#313145"
-COLOR_ACCENT    = "#7C3AED"
-COLOR_ACCENT2   = "#10B981"
-COLOR_WARN      = "#F59E0B"
-COLOR_DANGER    = "#EF4444"
-COLOR_TEXT      = "#E2E8F0"
-COLOR_MUTED     = "#94A3B8"
-COLOR_BORDER    = "#3F3F5A"
-COLOR_ROW_ODD   = "#252538"
-COLOR_ROW_EVEN  = "#2A2A3E"
-COLOR_SEL       = "#4C1D95"
+COLOR_BG        = "#F3F4F6"
+COLOR_SURFACE   = "#FFFFFF"
+COLOR_PANEL     = "#F9FAFB"
+COLOR_ACCENT    = "#6D28D9"
+COLOR_ACCENT2   = "#059669"
+COLOR_WARN      = "#D97706"
+COLOR_DANGER    = "#DC2626"
+COLOR_TEXT      = "#1F2937"
+COLOR_MUTED     = "#6B7280"
+COLOR_BORDER    = "#E5E7EB"
+COLOR_ROW_ODD   = "#FFFFFF"
+COLOR_ROW_EVEN  = "#F9FAFB"
+COLOR_SEL       = "#8B5CF6"
 
 
 def _btn_style(style):
     """Cấu hình style cho các nút."""
     style.configure("Action.TButton",
         font=("Segoe UI", 9, "bold"),
-        foreground=COLOR_TEXT,
+        foreground="#ffffff",
         background=COLOR_ACCENT,
         borderwidth=0, relief="flat", padding=(10, 6))
     style.map("Action.TButton",
-        background=[("active", "#6D28D9"), ("pressed", "#5B21B6")])
+        background=[("active", "#5B21B6"), ("pressed", "#4C1D95")])
 
     style.configure("Danger.TButton",
         font=("Segoe UI", 9, "bold"),
@@ -52,10 +52,10 @@ def _btn_style(style):
     style.configure("Neutral.TButton",
         font=("Segoe UI", 9),
         foreground=COLOR_TEXT,
-        background=COLOR_PANEL,
+        background="#E5E7EB",
         borderwidth=0, relief="flat", padding=(10, 6))
     style.map("Neutral.TButton",
-        background=[("active", COLOR_BORDER)])
+        background=[("active", "#D1D5DB")])
 
     style.configure("Search.TButton",
         font=("Segoe UI", 9),
@@ -63,7 +63,7 @@ def _btn_style(style):
         background=COLOR_ACCENT2,
         borderwidth=0, relief="flat", padding=(8, 5))
     style.map("Search.TButton",
-        background=[("active", "#059669")])
+        background=[("active", "#047857")])
 
 
 def sort_treeview(tree, col, reverse):
@@ -126,7 +126,7 @@ def tao_giao_dien_chinh(root):
             ("active",   COLOR_PANEL),     # nền hover: tím tối nhẹ
         ],
         foreground=[
-            ("selected", "#fff"),
+            ("selected", "#ffffff"),
             ("active",   COLOR_TEXT),      # chữ hover: giữ màu sáng
         ])
     style.map("Treeview.Heading",
@@ -140,14 +140,16 @@ def tao_giao_dien_chinh(root):
     ui = {}
 
     # ═══════════════ HEADER BAR ═══════════════════════
-    frame_header = tk.Frame(root, bg=COLOR_ACCENT, height=50)
+    frame_header = tk.Frame(root, bg="#EDE9FE", height=50)
     frame_header.pack(fill=tk.X)
     frame_header.pack_propagate(False)
 
     tk.Label(frame_header,
              text="🍳  Quản Lý Công Thức Nấu Ăn",
-             font=("Segoe UI", 14, "bold"),
-             bg=COLOR_ACCENT, fg="#fff").pack(side=tk.LEFT, padx=18, pady=10)
+             font=("Segoe UI", 15, "bold"),
+             bg="#EDE9FE", fg=COLOR_ACCENT).pack(side=tk.LEFT, padx=18, pady=10)
+    
+    ttk.Separator(root, orient=tk.HORIZONTAL).pack(fill=tk.X)
 
     # ═══════════════ TOOLBAR ══════════════════════════
     frame_toolbar = tk.Frame(root, bg=COLOR_SURFACE, pady=8, padx=12)
@@ -312,13 +314,33 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
     result = []
 
     # Tiêu đề form
-    tk.Label(top,
+    f_head = tk.Frame(top, bg="#EDE9FE")
+    f_head.pack(fill=tk.X)
+    tk.Label(f_head,
              text=("✏  Sửa Công thức" if is_edit else "＋  Thêm Công thức mới"),
              font=("Segoe UI", 13, "bold"),
-             bg=COLOR_ACCENT, fg="#fff").pack(fill=tk.X, pady=0)
+             bg="#EDE9FE", fg=COLOR_ACCENT).pack(pady=10)
+    ttk.Separator(top, orient=tk.HORIZONTAL).pack(fill=tk.X)
 
-    main = tk.Frame(top, bg=COLOR_BG, padx=22, pady=16)
-    main.pack(fill=tk.BOTH, expand=True)
+    # ── Container cuộn được ───────────────────────────
+    canvas = tk.Canvas(top, bg=COLOR_BG, highlightthickness=0)
+    scrollbar = ttk.Scrollbar(top, orient="vertical", command=canvas.yview)
+    main = tk.Frame(canvas, bg=COLOR_BG, padx=22, pady=16)
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    canvas_window = canvas.create_window((0, 0), window=main, anchor="nw")
+
+    def on_frame_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+    def on_canvas_configure(event):
+        canvas.itemconfig(canvas_window, width=event.width)
+    main.bind("<Configure>", on_frame_configure)
+    canvas.bind("<Configure>", on_canvas_configure)
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     # Helper tạo nhãn + widget
     def lbl(txt, row):
@@ -464,7 +486,17 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
     pw, ph = parent.winfo_width(), parent.winfo_height()
     px, py = parent.winfo_x(), parent.winfo_y()
     tw, th = top.winfo_reqwidth(), top.winfo_reqheight()
-    top.geometry(f"+{px + (pw - tw)//2}+{py + (ph - th)//2}")
+    
+    max_h = ph - 100
+    if th > max_h:
+        th = max_h
+        
+    top.geometry(f"{tw}x{th}+{px + (pw - tw)//2}+{py + (ph - th)//2}")
+
+    def _on_destroy(event):
+        if event.widget == top:
+            canvas.unbind_all("<MouseWheel>")
+    top.bind("<Destroy>", _on_destroy)
 
     top.wait_window()
     return result[0] if result else None
@@ -652,7 +684,7 @@ def hien_thi_chi_tiet(parent, data):
              font=("Segoe UI", 15, "bold"),
              bg=COLOR_BG, fg=COLOR_WARN).pack(anchor="w", padx=24, pady=(22, 6))
 
-    note_panel = tk.Frame(main, bg="#2D2B1A",
+    note_panel = tk.Frame(main, bg="#FEF3C7",
                           highlightbackground=COLOR_WARN,
                           highlightthickness=1)
     note_panel.pack(fill=tk.X, padx=24, pady=(0, 16))
@@ -665,7 +697,7 @@ def hien_thi_chi_tiet(parent, data):
             tk.Label(note_panel,
                      text=f"⚠  {note}",
                      font=("Segoe UI", 11),
-                     bg="#2D2B1A", fg=COLOR_WARN,
+                     bg="#FEF3C7", fg=COLOR_WARN,
                      justify="left", wraplength=710,
                      anchor="w").pack(anchor="w", padx=16, pady=5)
     else:
@@ -680,7 +712,7 @@ def hien_thi_chi_tiet(parent, data):
             tk.Label(note_panel,
                      text=f"▸  {note}",
                      font=("Segoe UI", 10),
-                     bg="#2D2B1A", fg=COLOR_WARN,
+                     bg="#FEF3C7", fg=COLOR_WARN,
                      justify="left", wraplength=710,
                      anchor="w").pack(anchor="w", padx=16, pady=3)
 
@@ -706,10 +738,13 @@ def hien_thi_thong_ke(parent, stats):
     
     top.grab_set()
 
-    tk.Label(top,
+    f_head = tk.Frame(top, bg="#EDE9FE")
+    f_head.pack(fill=tk.X)
+    tk.Label(f_head,
              text="📊  Thống kê Công thức Nấu ăn",
              font=("Segoe UI", 13, "bold"),
-             bg=COLOR_ACCENT, fg="#fff").pack(fill=tk.X)
+             bg="#EDE9FE", fg=COLOR_ACCENT).pack(pady=10)
+    ttk.Separator(top, orient=tk.HORIZONTAL).pack(fill=tk.X)
 
     if not stats:
         tk.Label(top, text="\nChưa có dữ liệu để thống kê.",
@@ -741,7 +776,7 @@ def hien_thi_thong_ke(parent, stats):
     kv(frame_text, "Lâu nhất:", f"{stats.get('tg_max', 0)} phút")
 
     # Tạo biểu đồ với Matplotlib
-    plt.style.use("dark_background")
+    plt.style.use("default")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), facecolor=COLOR_BG)
     fig.subplots_adjust(bottom=0.2, wspace=0.3)
 
