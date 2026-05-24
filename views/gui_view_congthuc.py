@@ -518,7 +518,7 @@ def hien_thi_chi_tiet(parent, data):
     scrollbar = ttk.Scrollbar(top, orient="vertical", command=canvas.yview)
     main = tk.Frame(canvas, bg=COLOR_BG)
 
-    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.configure(yscrollcommand = scrollbar.set)
     scrollbar.pack(side="right", fill="y")
     canvas.pack(side="left", fill="both", expand=True)
     canvas_window = canvas.create_window((0, 0), window=main, anchor="nw")

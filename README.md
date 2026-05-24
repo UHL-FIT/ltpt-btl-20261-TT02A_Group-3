@@ -128,7 +128,7 @@ Mỗi món đi kèm hướng dẫn nấu chi tiết theo từng bước và **l�
 
 | Tên | Vai trò |
 |-----|---------|
-| Lê Mạnh Quân | Người viết code |
+| Lê Mạnh Quân | Người viết code chính |
 | Hoàng Văn Thịnh | Người thuyết trình |
 | Đào Mạnh Huy | Người làm báo cáo |
 | Ngô Hoàng Tuấn Tú | |

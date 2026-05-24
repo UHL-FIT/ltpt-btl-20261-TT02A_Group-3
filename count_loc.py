@@ -3,7 +3,7 @@ import os
 def count_loc(root_dir):
     total_lines = 0
     total_code_lines = 0
-    # Bỏ qua các thư mục không chứa source code nghiệp vụ
+    # Bỏ qua các thư mục không chứa source code nghiệp vụ   
     exclude_dirs = {'.venv', 'tests', '__pycache__', 'dist', 'build', '.git'}
     
     print(f"{'File Path':<45} | {'Total Lines':<15} | {'Code Lines':<20}")
