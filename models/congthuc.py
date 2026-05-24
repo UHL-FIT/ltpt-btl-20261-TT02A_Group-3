@@ -33,68 +33,69 @@ def khoi_tao_db():
     db_exists = os.path.exists(FILE_DB)
     
     conn = sqlite3.connect(FILE_DB)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS congthuc (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ten_mon TEXT UNIQUE NOT NULL,
-            loai_mon TEXT NOT NULL,
-            nguyen_lieu TEXT,
-            dinh_luong TEXT,
-            thoi_gian INTEGER DEFAULT 0,
-            cach_lam TEXT DEFAULT '',
-            hinh_anh TEXT DEFAULT '',
-            luu_y TEXT DEFAULT ''
-        )
-    ''')
-    
-    # Auto-migration cho DB cũ: Thêm cột cach_lam và hinh_anh nếu chưa có
     try:
-        cursor.execute('ALTER TABLE congthuc ADD COLUMN cach_lam TEXT DEFAULT ""')
-    except sqlite3.OperationalError:
-        pass # Cột đã tồn tại
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS congthuc (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_mon TEXT UNIQUE NOT NULL,
+                loai_mon TEXT NOT NULL,
+                nguyen_lieu TEXT,
+                dinh_luong TEXT,
+                thoi_gian INTEGER DEFAULT 0,
+                cach_lam TEXT DEFAULT '',
+                hinh_anh TEXT DEFAULT '',
+                luu_y TEXT DEFAULT ''
+            )
+        ''')
         
-    try:
-        cursor.execute('ALTER TABLE congthuc ADD COLUMN hinh_anh TEXT DEFAULT ""')
-    except sqlite3.OperationalError:
-        pass # Cột đã tồn tại
-
-    try:
-        cursor.execute('ALTER TABLE congthuc ADD COLUMN luu_y TEXT DEFAULT ""')
-    except sqlite3.OperationalError:
-        pass # Cột đã tồn tại
-
-    conn.commit()
-    
-    # Tự động migrate dữ liệu từ file CSV cũ sang Database (chỉ chạy 1 lần khi tạo DB mới)
-    csv_file = os.path.join(os.path.dirname(FILE_DB), "congthuc.csv")
-    if not db_exists and os.path.exists(csv_file):
+        # Auto-migration cho DB cũ: Thêm cột cach_lam và hinh_anh nếu chưa có
         try:
-            df_csv = pd.read_csv(csv_file, encoding="utf-8-sig", dtype=str)
-            for _, row in df_csv.iterrows():
-                try:
-                    thoi_gian_val = row.get("thoi_gian", 0)
-                    if pd.isna(thoi_gian_val) or str(thoi_gian_val).strip() == "":
-                        thoi_gian_val = 0
-                    
-                    cursor.execute('''
-                        INSERT INTO congthuc (ten_mon, loai_mon, nguyen_lieu, dinh_luong, thoi_gian, cach_lam, hinh_anh)
-                        VALUES (?, ?, ?, ?, ?, '', '')
-                    ''', (
-                        str(row.get("ten_mon", "")).strip(),
-                        str(row.get("loai_mon", "Khác")).strip(),
-                        str(row.get("nguyen_lieu", "")).strip(),
-                        str(row.get("dinh_luong", "")).strip(),
-                        int(float(thoi_gian_val))
-                    ))
-                except sqlite3.IntegrityError:
-                    pass # Bỏ qua nếu món đã tồn tại
-            conn.commit()
-            logger.info("Đã migrate dữ liệu từ congthuc.csv sang congthuc.db thành công.")
-        except Exception as e:
-            logger.error(f"Lỗi migrate CSV sang DB: {e}")
+            cursor.execute('ALTER TABLE congthuc ADD COLUMN cach_lam TEXT DEFAULT ""')
+        except sqlite3.OperationalError:
+            pass # Cột đã tồn tại
             
-    conn.close()
+        try:
+            cursor.execute('ALTER TABLE congthuc ADD COLUMN hinh_anh TEXT DEFAULT ""')
+        except sqlite3.OperationalError:
+            pass # Cột đã tồn tại
+
+        try:
+            cursor.execute('ALTER TABLE congthuc ADD COLUMN luu_y TEXT DEFAULT ""')
+        except sqlite3.OperationalError:
+            pass # Cột đã tồn tại
+
+        conn.commit()
+        
+        # Tự động migrate dữ liệu từ file CSV cũ sang Database (chỉ chạy 1 lần khi tạo DB mới)
+        csv_file = os.path.join(os.path.dirname(FILE_DB), "congthuc.csv")
+        if not db_exists and os.path.exists(csv_file):
+            try:
+                df_csv = pd.read_csv(csv_file, encoding="utf-8-sig", dtype=str)
+                for _, row in df_csv.iterrows():
+                    try:
+                        thoi_gian_val = row.get("thoi_gian", 0)
+                        if pd.isna(thoi_gian_val) or str(thoi_gian_val).strip() == "":
+                            thoi_gian_val = 0
+                        
+                        cursor.execute('''
+                            INSERT INTO congthuc (ten_mon, loai_mon, nguyen_lieu, dinh_luong, thoi_gian, cach_lam, hinh_anh)
+                            VALUES (?, ?, ?, ?, ?, '', '')
+                        ''', (
+                            str(row.get("ten_mon", "")).strip(),
+                            str(row.get("loai_mon", "Khác")).strip(),
+                            str(row.get("nguyen_lieu", "")).strip(),
+                            str(row.get("dinh_luong", "")).strip(),
+                            int(float(thoi_gian_val))
+                        ))
+                    except sqlite3.IntegrityError:
+                        pass # Bỏ qua nếu món đã tồn tại
+                conn.commit()
+                logger.info("Đã migrate dữ liệu từ congthuc.csv sang congthuc.db thành công.")
+            except Exception as e:
+                logger.error(f"Lỗi migrate CSV sang DB: {e}")
+    finally:
+        conn.close()
 
 
 def lay_danh_sach():
@@ -103,13 +104,14 @@ def lay_danh_sach():
     để các tầng View/Controller dễ hiển thị.
     """
     khoi_tao_db()
+    conn = sqlite3.connect(FILE_DB)
     try:
-        conn = sqlite3.connect(FILE_DB)
         df = pd.read_sql_query("SELECT ten_mon, loai_mon, nguyen_lieu, dinh_luong, thoi_gian, cach_lam, hinh_anh, luu_y FROM congthuc", conn)
-        conn.close()
     except Exception as e:
         logger.error(f"Lỗi đọc DB: {e}")
         return pd.DataFrame(), False
+    finally:
+        conn.close()
 
     if df.empty:
         return df, True
@@ -148,15 +150,14 @@ def them_cong_thuc(df, data):
     except (ValueError, TypeError):
         return df, False, "Thời gian chuẩn bị phải là số nguyên!"
 
+    conn = sqlite3.connect(FILE_DB)
     try:
-        conn = sqlite3.connect(FILE_DB)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO congthuc (ten_mon, loai_mon, nguyen_lieu, dinh_luong, thoi_gian, cach_lam, hinh_anh, luu_y)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (ten_mon, loai_mon, nguyen_lieu, dinh_luong, thoi_gian, cach_lam, hinh_anh, luu_y))
         conn.commit()
-        conn.close()
         logger.info(f"Đã thêm công thức vào DB: {ten_mon}")
         
         # Lấy danh sách mới nhất từ DB trả về
@@ -167,6 +168,8 @@ def them_cong_thuc(df, data):
     except Exception as e:
         logger.error(f"Lỗi thêm vào DB: {e}")
         return df, False, f"Lỗi cơ sở dữ liệu: {e}"
+    finally:
+        conn.close()
 
 
 def sua_cong_thuc(df, old_ten, data):
@@ -191,8 +194,8 @@ def sua_cong_thuc(df, old_ten, data):
     except (ValueError, TypeError):
         return df, False, "Thời gian chuẩn bị phải là số nguyên!"
 
+    conn = sqlite3.connect(FILE_DB)
     try:
-        conn = sqlite3.connect(FILE_DB)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE congthuc
@@ -201,11 +204,9 @@ def sua_cong_thuc(df, old_ten, data):
         ''', (ten_moi, loai_mon, nguyen_lieu, dinh_luong, thoi_gian, cach_lam, hinh_anh, luu_y, old_ten))
         
         if cursor.rowcount == 0:
-            conn.close()
             return df, False, f"Không tìm thấy công thức '{old_ten}'!"
             
         conn.commit()
-        conn.close()
         logger.info(f"Đã sửa công thức trong DB: {old_ten} -> {ten_moi}")
         
         new_df, _ = lay_danh_sach()
@@ -215,6 +216,8 @@ def sua_cong_thuc(df, old_ten, data):
     except Exception as e:
         logger.error(f"Lỗi sửa trong DB: {e}")
         return df, False, f"Lỗi cơ sở dữ liệu: {e}"
+    finally:
+        conn.close()
 
 
 def xoa_cong_thuc(df, ten_list):
@@ -224,13 +227,12 @@ def xoa_cong_thuc(df, ten_list):
     if not ten_list:
         return df, False, "Danh sách trống!"
 
+    conn = sqlite3.connect(FILE_DB)
     try:
-        conn = sqlite3.connect(FILE_DB)
         cursor = conn.cursor()
         placeholders = ','.join('?' * len(ten_list))
         cursor.execute(f'DELETE FROM congthuc WHERE ten_mon IN ({placeholders})', ten_list)
         conn.commit()
-        conn.close()
         logger.info(f"Đã xóa {len(ten_list)} công thức khỏi DB.")
         
         new_df, _ = lay_danh_sach()
@@ -238,6 +240,8 @@ def xoa_cong_thuc(df, ten_list):
     except Exception as e:
         logger.error(f"Lỗi xóa trong DB: {e}")
         return df, False, f"Lỗi cơ sở dữ liệu: {e}"
+    finally:
+        conn.close()
 
 
 def thong_ke(df):
@@ -278,3 +282,34 @@ def thong_ke(df):
         stats["top_nguyen_lieu"] = {}
 
     return stats
+
+
+def lay_chi_tiet(ten_mon):
+    """
+    Truy vấn trực tiếp từ cơ sở dữ liệu SQLite để lấy chi tiết của 1 công thức cụ thể theo tên,
+    đảm bảo dữ liệu luôn đồng bộ và chính xác nhất.
+    """
+    khoi_tao_db()
+    conn = sqlite3.connect(FILE_DB)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT ten_mon, loai_mon, nguyen_lieu, dinh_luong, thoi_gian, cach_lam, hinh_anh, luu_y FROM congthuc WHERE ten_mon = ?", (ten_mon,))
+        row = cursor.fetchone()
+        if row:
+            return {
+                "ten_mon": row[0],
+                "loai_mon": row[1],
+                "nguyen_lieu": row[2] or "",
+                "dinh_luong": row[3] or "",
+                "thoi_gian": int(row[4] or 0),
+                "cach_lam": row[5] or "",
+                "hinh_anh": row[6] or "",
+                "luu_y": row[7] or ""
+            }, True
+        return None, False
+    except Exception as e:
+        logger.error(f"Lỗi truy vấn chi tiết từ DB: {e}")
+        return None, False
+    finally:
+        conn.close()
+

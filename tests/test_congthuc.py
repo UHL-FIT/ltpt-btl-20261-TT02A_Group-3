@@ -14,14 +14,23 @@ import pandas as pd
 # Đảm bảo import được từ thư mục gốc project
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Patch FILE_CONGTHUC trước khi import model
+# Patch FILE_DB trước khi test để chạy độc lập
+import tempfile
+temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+temp_db_path = temp_db.name
+temp_db.close()
+
 import models.congthuc as model
+model.FILE_DB = temp_db_path
+# Khởi tạo db mới tinh cho môi trường test
+model.khoi_tao_db()
+
 
 
 def _make_df(*rows):
     """Helper tạo DataFrame mẫu từ danh sách dict."""
     if not rows:
-        return pd.DataFrame(columns=model.COLS_CSV)
+        return pd.DataFrame(columns=model.COLS_DB)
     df = pd.DataFrame(list(rows))
     df["thoi_gian"] = pd.to_numeric(df["thoi_gian"], errors="coerce").fillna(0).astype(int)
     return df
@@ -31,7 +40,13 @@ class TestThemCongThuc(unittest.TestCase):
     """Kiểm tra hàm them_cong_thuc()"""
 
     def setUp(self):
-        self.df = pd.DataFrame(columns=model.COLS_CSV)
+        import sqlite3
+        conn = sqlite3.connect(model.FILE_DB)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM congthuc")
+        conn.commit()
+        conn.close()
+        self.df = pd.DataFrame(columns=model.COLS_DB)
 
     def test_them_thanh_cong(self):
         data = {"ten_mon": "Phở bò", "loai_mon": "Món chính",
@@ -74,9 +89,15 @@ class TestSuaCongThuc(unittest.TestCase):
     """Kiểm tra hàm sua_cong_thuc()"""
 
     def setUp(self):
+        import sqlite3
+        conn = sqlite3.connect(model.FILE_DB)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM congthuc")
+        conn.commit()
+        conn.close()
         data = {"ten_mon": "Phở bò", "loai_mon": "Món chính",
                 "nguyen_lieu": "Bún", "dinh_luong": "200g", "thoi_gian": 30}
-        df = pd.DataFrame(columns=model.COLS_CSV)
+        df = pd.DataFrame(columns=model.COLS_DB)
         self.df, _, _ = model.them_cong_thuc(df, data)
 
     def test_sua_thanh_cong(self):
@@ -104,7 +125,13 @@ class TestXoaCongThuc(unittest.TestCase):
     """Kiểm tra hàm xoa_cong_thuc()"""
 
     def setUp(self):
-        df = pd.DataFrame(columns=model.COLS_CSV)
+        import sqlite3
+        conn = sqlite3.connect(model.FILE_DB)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM congthuc")
+        conn.commit()
+        conn.close()
+        df = pd.DataFrame(columns=model.COLS_DB)
         for ten, loai, tg in [
             ("Phở bò", "Món chính", 30),
             ("Bánh mì", "Khai vị", 10),
@@ -136,7 +163,13 @@ class TestThongKe(unittest.TestCase):
     """Kiểm tra hàm thong_ke()"""
 
     def setUp(self):
-        df = pd.DataFrame(columns=model.COLS_CSV)
+        import sqlite3
+        conn = sqlite3.connect(model.FILE_DB)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM congthuc")
+        conn.commit()
+        conn.close()
+        df = pd.DataFrame(columns=model.COLS_DB)
         rows = [
             ("Phở bò",   "Món chính",    "Bún | Thịt bò | Hành", "200g | 300g | 50g", 60),
             ("Bún bò",   "Món chính",    "Bún | Thịt bò | Sả",   "200g | 300g | 30g", 120),
@@ -176,7 +209,7 @@ class TestThongKe(unittest.TestCase):
         self.assertEqual(top["Thịt bò"], 2)
 
     def test_thong_ke_rong(self):
-        df_empty = pd.DataFrame(columns=model.COLS_CSV)
+        df_empty = pd.DataFrame(columns=model.COLS_DB)
         stats = model.thong_ke(df_empty)
         self.assertEqual(stats, {})
 
