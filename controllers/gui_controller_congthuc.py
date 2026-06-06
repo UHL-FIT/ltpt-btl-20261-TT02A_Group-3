@@ -2,162 +2,129 @@
 controllers/gui_controller_congthuc.py
 =======================================
 Controller kết nối Model (congthuc.py) và View (gui_view_congthuc.py).
-Đóng vai trò là "Bộ não" quản lý luồng điều hướng của hệ thống Dashboard và xử lý các sự kiện GUI.
-
-Ghi chú cho người mới học:
-- Controller lắng nghe hành động của người dùng trên giao diện (ví dụ: bấm nút Thêm, Xóa, Tìm kiếm).
-- Nó sẽ gọi Model để lấy hoặc cập nhật dữ liệu dưới Database.
-- Sau đó, nó sẽ ra lệnh cho View cập nhật giao diện hiển thị cho phù hợp.
-- Đây là nơi chứa toàn bộ "Logic điều khiển" (Business Logic) của phần mềm.
+Chứa toàn bộ logic điều khiển (business logic) và xử lý sự kiện giao diện.
 """
 
-import tkinter as tk             # Thư viện giao diện đồ họa chuẩn của Python
-from tkinter import messagebox  # Thư viện hiển thị hộp thoại thông báo (cảnh báo, thông tin, xác nhận)
-import pandas as pd             # Thư viện xử lý bảng dữ liệu
-from models import congthuc as model  # Nhập tầng Model quản lý dữ liệu
-import views.gui_view_congthuc as view  # Nhập tầng View quản lý giao diện
-from utils.logger import setup_logger   # Nhập cấu hình ghi nhật ký
+import tkinter as tk
+from tkinter import messagebox
+import pandas as pd
+from models import congthuc as model
+import views.gui_view_congthuc as view
+from utils.logger import setup_logger
 
-# Khởi tạo logger riêng cho tầng Controller
+# Logger riêng cho tầng Controller
 logger = setup_logger("ctrl_congthuc")
 
-# ─── TRẠNG THÁI TOÀN CỤC CỦA ỨNG DỤNG (APPLICATION STATE) ──────────────────────
-# Trong các ứng dụng lớn, ta thường đóng gói các biến này vào một Class. Tuy nhiên,
-# để giữ cấu trúc đơn giản và logic nguyên bản, dự án dùng các biến ở cấp độ Module:
-app_df   = pd.DataFrame()  # Bảng dữ liệu công thức nấu ăn hiện hành đang lưu trong bộ nhớ RAM
-app_ui   = {}              # Bộ từ điển chứa tất cả các widget giao diện (nút bấm, ô nhập, bảng...) để dễ quản lý
-app_root = None            # Đối tượng cửa sổ chính của ứng dụng Tkinter (Main Window)
-active_detail_windows = {}  # Quản lý các cửa sổ xem chi tiết món ăn đang mở trên màn hình: {ten_mon: window_object}
-                            # Giúp đồng bộ hóa: khi sửa/xóa món ăn, ta biết cửa sổ nào đang mở để đóng hoặc vẽ lại!
+# ─── TRẠNG THÁI TOÀN CỤC CỦA ỨNG DỤNG ──────────────────────────────────────────
+app_df   = pd.DataFrame()  # DataFrame công thức đang lưu trong bộ nhớ
+app_ui   = {}              # Dict chứa tất cả widget giao diện
+app_root = None            # Cửa sổ Tkinter chính
+active_detail_windows = {} # Các cửa sổ chi tiết đang mở: {ten_mon: window_object}
 
 
-# ─── HÀM TRỢ GIÚP NỘI BỘ (INTERNAL HELPERS) ───────────────────────────
+# ─── HÀM TRỢ GIÚP NỘI BỘ ───────────────────────────────────────────────────────
 
 def _tai_du_lieu():
-    """
-    Tải dữ liệu mới nhất từ model, áp dụng bộ lọc hiển thị bảng chính
-    và đồng bộ hóa toàn bộ các số liệu thống kê trên giao diện.
-    """
-    global app_df  # Khai báo sử dụng biến toàn cục app_df để cập nhật dữ liệu mới nhất
-    
-    # 1. Gọi Model đọc cơ sở dữ liệu SQLite
+    """Tải dữ liệu mới nhất từ DB, áp dụng bộ lọc và cập nhật toàn bộ giao diện."""
+    global app_df
+
     app_df, ok = model.lay_danh_sach()
     if not ok:
         messagebox.showerror("Lỗi", "Không thể tải dữ liệu công thức từ cơ sở dữ liệu.")
         return
 
-    # 2. Áp dụng bộ lọc tìm kiếm hiện hành trên giao diện và cập nhật bảng chính ở Trang chủ
-    # app_df.copy() nhân bản DataFrame để tránh làm mất dữ liệu gốc khi thực hiện lọc
+    # Lọc và hiển thị bảng chính
     display_df = _apply_filter(app_df.copy())
-    view.hien_thi_bang(app_ui, display_df)  # Gọi View nạp dữ liệu đã lọc vào bảng Treeview
+    view.hien_thi_bang(app_ui, display_df)
 
-    # 3. Cập nhật thanh trạng thái (Status Bar) dưới đáy bảng Trang chủ
+    # Cập nhật thanh trạng thái theo dữ liệu đang lọc
     stats = model.thong_ke(display_df)
     view.cap_nhat_status(app_ui, stats)
 
-    # 4. Đồng bộ tính toán thống kê toàn bộ và cập nhật trang Dashboard biểu đồ tĩnh
+    # Cập nhật trang thống kê theo toàn bộ dữ liệu
     stats_all = model.thong_ke(app_df)
     view.cap_nhat_trang_thong_ke(app_ui, stats_all)
 
 
 def _apply_filter(df):
     """
-    Lọc dữ liệu DataFrame theo loại món ăn và từ khóa tìm kiếm tiếng Việt thông minh.
-    
+    Lọc DataFrame theo loại món và từ khóa tìm kiếm (hỗ trợ tiếng Việt không dấu).
+
     Tham số:
-      - df (DataFrame): Bản sao dữ liệu công thức nấu ăn cần lọc.
-      
+      df (DataFrame): Bản sao dữ liệu cần lọc.
     Trả về:
-      - DataFrame: Dữ liệu đã được lọc sạch.
+      DataFrame đã lọc.
     """
-    import unicodedata  # Thư viện xử lý chuẩn hóa chuỗi ký tự Unicode chuẩn
-    
-    # Nếu bảng rỗng thì trả về luôn, không cần lọc
+    import unicodedata
+
     if df is None or df.empty:
         return df
 
-    # LỌC THEO LOẠI MÓN ĂN:
-    loai = app_ui["cbo_filter"].get()  # Lấy giá trị đang chọn trong hộp Combobox loại món
+    # Lọc theo loại món ăn từ Combobox
+    loai = app_ui["cbo_filter"].get()
     if loai and loai != "Tất cả":
-        # Giữ lại các hàng có cột "loai_mon" bằng đúng loại món đang chọn
         df = df[df["loai_mon"] == loai]
 
-    # LỌC THEO TỪ KHÓA TÌM KIẾM THÔNG MINH (TÌM KIẾM KHÔNG DẤU):
-    keyword = app_ui["ent_search"].get().strip().lower()  # Lấy từ khóa trong ô nhập, xóa khoảng trắng và đưa về chữ thường
+    # Lọc theo từ khóa tìm kiếm
+    keyword = app_ui["ent_search"].get().strip().lower()
     if keyword:
-        
-        # Hàm nội bộ hỗ trợ xóa bỏ toàn bộ dấu tiếng Việt và chuyển chữ 'đ', 'Đ' thành 'd', 'D'
-        # Giải thích thuật toán cho người mới:
-        # - unicodedata.normalize('NFKD', input_str) sẽ phân tách các ký tự tiếng Việt có dấu
-        #   thành dạng: chữ cái gốc + dấu kết hợp (ví dụ: chữ 'á' tách thành 'a' và dấu ' sắc').
-        # - unicodedata.combining(c) kiểm tra xem ký tự c có phải là dấu kết hợp hay không.
-        # - Ta dùng vòng lặp loại bỏ toàn bộ dấu này đi, chỉ giữ lại chữ cái gốc.
-        # - Cuối cùng, dùng replace() để chuyển đổi chữ 'đ'/'Đ' thành 'd'/'D' thủ công vì normalize không tự xử lý chữ đ.
+
         def remove_accents(input_str):
+            """Xóa dấu tiếng Việt và chuẩn hóa chữ đ/Đ thành d/D."""
             if not isinstance(input_str, str):
                 input_str = str(input_str)
             s = unicodedata.normalize('NFKD', input_str)
             s = "".join([c for c in s if not unicodedata.combining(c)])
             return s.replace('đ', 'd').replace('Đ', 'D')
-        
-        # Tách từ khóa tìm kiếm thành danh sách các từ riêng biệt để thực hiện tìm kiếm AND logic
-        # Ví dụ: từ khóa "cá thu" sẽ tách thành ["ca", "thu"]
+
+        # Tách từ khóa thành từng từ để tìm kiếm AND logic
         kw_parts = [remove_accents(k) for k in keyword.split()]
 
-        # TC-18 FIX: Thay thế check_row + apply() bằng vectorized pandas str.contains.
-        # Cách cũ dùng " ".join(row.astype(str)) nối tất cả cột thành 1 chuỗi dài, gây ra
-        # lỗi nhận diện từ khóa con khi dữ liệu số (thoi_gian) hoặc NaN xen vào.
-        # Cách mới: normalize riêng từng cột text quan trọng rồi dùng str.contains(regex=False)
-        # cho mỗi từ khóa - đảm bảo tìm "cua" trong "Súp cua biển" luôn chính xác.
         def normalize_col(series):
             """Chuẩn hóa cột pandas: chuyển sang str, xóa dấu, đưa về chữ thường."""
             return series.astype(str).apply(lambda x: remove_accents(x.lower()))
 
-        # Ghép tên món + loại món + nguyên liệu thành chuỗi tìm kiếm tổng hợp
+        # Ghép các cột tìm kiếm thành một chuỗi tổng hợp
         search_series = (
             normalize_col(df["ten_mon"]) + " " +
             normalize_col(df["loai_mon"]) + " " +
             normalize_col(df["nguyen_lieu"])
         )
 
-        # Với mỗi từ khóa: dùng str.contains(regex=False) - tìm kiếm chuỗi con đơn giản, không regex
-        # Kết hợp AND: tất cả các từ đều phải xuất hiện trong chuỗi tổng hợp
+        # AND logic: tất cả từ khóa phải xuất hiện trong chuỗi tổng hợp
         mask = pd.Series([True] * len(df), index=df.index)
         for kw in kw_parts:
             mask = mask & search_series.str.contains(kw, regex=False, na=False)
 
-        df = df[mask]  # Chỉ giữ lại các dòng thỏa mãn toàn bộ từ khóa tìm kiếm
+        df = df[mask]
 
     return df
 
 
-# ─── BỘ PHẬN XỬ LÝ SỰ KIỆN GIAO DIỆN (EVENT HANDLERS) ───────────────────────────
+# ─── XỬ LÝ SỰ KIỆN GIAO DIỆN ────────────────────────────────────────────────────
 
 def on_trangchu():
-    """Chuyển đổi giao diện sang màn hình Trang chủ (danh sách công thức nấu ăn)."""
+    """Chuyển sang màn hình Trang chủ."""
     logger.info("Chuyển sang Trang chủ.")
-    view.switch_page(app_ui, "trang_chu")  # Gọi View hiển thị trang chủ và ẩn các trang khác
+    view.switch_page(app_ui, "trang_chu")
 
 
 def on_thongke():
-    """Tính toán lại toàn bộ dữ liệu thống kê và chuyển đổi sang màn hình báo cáo Dashboard."""
+    """Tính toán thống kê và chuyển sang màn hình Dashboard."""
     logger.info("Chuyển sang màn hình Thống kê.")
-    stats = model.thong_ke(app_df)  # Tính toán thống kê trên toàn bộ cơ sở dữ liệu
-    view.cap_nhat_trang_thong_ke(app_ui, stats)  # Ra lệnh cho View vẽ lại các biểu đồ Matplotlib
-    view.switch_page(app_ui, "thong_ke")         # Chuyển tab sang trang thống kê
+    stats = model.thong_ke(app_df)
+    view.cap_nhat_trang_thong_ke(app_ui, stats)
+    view.switch_page(app_ui, "thong_ke")
 
 
 def on_about():
-    """Chuyển đổi giao diện sang màn hình giới thiệu thông tin nhóm thực hiện và phiên bản phần mềm."""
+    """Chuyển sang màn hình Giới thiệu nhóm."""
     logger.info("Chuyển sang màn hình Giới thiệu.")
     view.switch_page(app_ui, "about")
 
 
 def on_search(*_):
-    """
-    Thực hiện bộ lọc tìm kiếm khi người dùng bấm nút 'Tìm' hoặc nhấn phím 'Enter'.
-    Sau đó vẽ lại bảng Treeview chính và cập nhật số liệu thanh trạng thái dưới đáy.
-    """
+    """Lọc và vẽ lại bảng khi người dùng bấm Tìm hoặc nhấn Enter."""
     logger.info("Thực hiện tìm kiếm.")
     display_df = _apply_filter(app_df.copy())
     view.hien_thi_bang(app_ui, display_df)
@@ -166,142 +133,112 @@ def on_search(*_):
 
 
 def on_clear_search():
-    """Xóa sạch từ khóa trong ô tìm kiếm, đưa bộ lọc loại món về mặc định và tải lại toàn bộ dữ liệu."""
+    """Xóa bộ lọc tìm kiếm và tải lại toàn bộ dữ liệu."""
     logger.info("Xóa bộ lọc tìm kiếm.")
-    app_ui["ent_search"].delete(0, tk.END)  # Xóa sạch chữ trong ô Entry tìm kiếm
-    app_ui["cbo_filter"].set("Tất cả")       # Chọn lại loại món là "Tất cả" trong Combobox
-    _tai_du_lieu()                          # Nạp lại dữ liệu ban đầu
+    app_ui["ent_search"].delete(0, tk.END)  # Xóa ô tìm kiếm
+    app_ui["cbo_filter"].set("Tất cả")      # Đặt lại Combobox về mặc định
+    _tai_du_lieu()
 
 
 def on_them():
-    """Mở cửa sổ Form Popup nhập liệu để người dùng thêm công thức món ăn mới."""
+    """Mở form thêm công thức mới và lưu vào DB nếu hợp lệ."""
     global app_df
     logger.info("Mở Form thêm công thức.")
-    # Gọi View hiển thị Form Popup (is_edit=False nghĩa là form thêm mới trống)
     data = view.hien_thi_form(app_root, is_edit=False)
     if data:
-        # Nếu người dùng nhập liệu hợp lệ và bấm "Lưu lại", data sẽ chứa dữ liệu món ăn dạng dict
-        app_df, ok, msg = model.them_cong_thuc(app_df, data)  # Gọi Model lưu vào cơ sở dữ liệu SQLite
+        app_df, ok, msg = model.them_cong_thuc(app_df, data)
         if ok:
-            _tai_du_lieu()  # Tải lại bảng chính và Dashboard thống kê để hiển thị món ăn mới ngay lập tức!
+            _tai_du_lieu()
             messagebox.showinfo("Thành công", msg)
         else:
             messagebox.showerror("Lỗi", msg)
 
 
 def on_sua():
-    """
-    Mở Form Popup sửa đổi thông tin cho công thức món ăn đang được chọn trên bảng.
-    Hỗ trợ đồng bộ hóa giao diện cực kỳ chuyên nghiệp (Real-time update).
-    """
+    """Mở form sửa công thức đang chọn và đồng bộ cửa sổ chi tiết nếu đang mở."""
     global app_df
     logger.info("Mở Form sửa công thức.")
-    tree = app_ui["tree"]  # Lấy bảng Treeview từ giao diện
+    tree = app_ui["tree"]
 
-    # Lấy danh sách các dòng được tick checkbox (☑) trong bảng chính
+    # Ưu tiên lấy dòng đang được tick checkbox, sau đó mới xét dòng đang bôi đen
     checked = [iid for iid in tree.get_children()
                if tree.item(iid, "values")[0] == "☑"]
-    
-    # Nếu không có dòng nào được tick checkbox, kiểm tra xem người dùng có click chuột bôi đen dòng nào không
     if not checked:
         checked = list(tree.selection())
-        
-    # Cảnh báo nếu người dùng chưa chọn món ăn nào cả
+
     if not checked:
         messagebox.showwarning("Cảnh báo",
             "Vui lòng tích chọn (☑) hoặc bấm chọn 1 công thức trên bảng để sửa!")
         return
-        
-    # Cảnh báo nếu chọn cùng lúc nhiều hơn 1 món ăn để sửa
+
     if len(checked) > 1:
         messagebox.showwarning("Cảnh báo",
             "Chỉ được phép chọn duy nhất 1 công thức để sửa tại một thời điểm!")
         return
 
-    # Lấy dữ liệu của dòng đang chọn
-    # vals[0]: dấu check, vals[1]: STT, vals[2]: tên món ăn
+    # vals[0]: dấu check, vals[1]: STT, vals[2]: tên món
     vals = tree.item(checked[0], "values")
     ten_mon = vals[2]
-    
-    # Truy vấn thông tin dòng đó trong DataFrame hiện tại
+
     row = app_df[app_df["ten_mon"] == ten_mon]
     if row.empty:
         messagebox.showerror("Lỗi", "Không tìm thấy công thức nấu ăn tương ứng!")
         return
 
-    # Chuyển dòng dữ liệu thành dạng từ điển dict để truyền vào form điền sẵn dữ liệu cũ
     current_data = row.iloc[0].to_dict()
-    
-    # Hiển thị Form Popup điền sẵn dữ liệu cũ của món ăn (is_edit=True)
     data = view.hien_thi_form(app_root, is_edit=True, current_data=current_data)
     if data:
-        # Gọi Model cập nhật dữ liệu mới vào SQLite Database
         app_df, ok, msg = model.sua_cong_thuc(app_df, ten_mon, data)
         if ok:
-            _tai_du_lieu()  # Cập nhật bảng biểu ngay lập tức
-            
-            # =========================================================================
-            # ĐỒNG BỘ HÓA CỰC KỲ CHUYÊN NGHIỆP:
-            # Nếu món ăn này đang được mở xem ở tab chi tiết phụ, ta phải tự động đóng
-            # tab chi tiết cũ đi và mở lại tab chi tiết mới chứa thông tin đã sửa từ DB!
-            # =========================================================================
+            _tai_du_lieu()
+
+            # Nếu cửa sổ chi tiết của món này đang mở, đóng và mở lại với dữ liệu mới
             if ten_mon in active_detail_windows:
-                # Tìm cửa sổ cũ đang hiển thị món ăn này
                 old_win = active_detail_windows.pop(ten_mon, None)
                 if old_win and old_win.winfo_exists():
-                    old_win.destroy()  # Đóng cửa sổ cũ
-                
-                # Mở lại cửa sổ chi tiết mới với dữ liệu cập nhật
+                    old_win.destroy()
+
                 ten_moi = data.get("ten_mon", ten_mon)
-                new_data, d_ok = model.lay_chi_tiet(ten_moi)  # Truy vấn DB lấy thông tin mới nhất
+                new_data, d_ok = model.lay_chi_tiet(ten_moi)
                 if d_ok:
                     new_win = view.hien_thi_chi_tiet(app_root, new_data)
                     if new_win:
                         active_detail_windows[ten_moi] = new_win
-                        # Ràng buộc sự kiện: Khi người dùng tự tay tắt cửa sổ chi tiết mới, 
-                        # ta tự động loại bỏ nó ra khỏi danh sách active_detail_windows
-                        new_win.bind("<Destroy>", lambda e, name=ten_moi, w=new_win: active_detail_windows.pop(name, None) if (e.widget == w) else None)
-            
+                        new_win.bind("<Destroy>", lambda e, name=ten_moi, w=new_win:
+                            active_detail_windows.pop(name, None) if (e.widget == w) else None)
+
             messagebox.showinfo("Thành công", msg)
         else:
             messagebox.showerror("Lỗi", msg)
 
 
 def on_xoa():
-    """
-    Xóa các công thức nấu ăn đã được tick chọn (☑).
-    Đồng thời tự động tắt các cửa sổ xem chi tiết của món ăn đã bị xóa để tránh xung đột.
-    """
+    """Xóa các công thức đã tick chọn và đóng các cửa sổ chi tiết liên quan."""
     global app_df
     logger.info("Xóa các công thức đã chọn.")
     tree = app_ui["tree"]
-    
-    # Thu thập toàn bộ tên món ăn của các dòng có checkbox là "☑"
+
+    # Thu thập tên các món ăn được tick checkbox
     ten_list = [tree.item(iid, "values")[2]
                 for iid in tree.get_children()
                 if tree.item(iid, "values")[0] == "☑"]
-                
+
     if not ten_list:
         messagebox.showwarning("Cảnh báo",
             "Vui lòng tick chọn (☑) ít nhất 1 công thức trên bảng để xóa!")
         return
-        
-    # Hiện hộp thoại xác nhận có thực sự muốn xóa hay không (Yes/No)
+
     if messagebox.askyesno("Xác nhận",
                            f"Bạn có chắc chắn muốn xóa {len(ten_list)} công thức nấu ăn đã chọn?"):
-        # Gọi Model xóa các món ăn khỏi cơ sở dữ liệu SQLite
         app_df, ok, msg = model.xoa_cong_thuc(app_df, ten_list)
         if ok:
-            # =========================================================================
-            # ĐỒNG BỘ HÓA: Tự động đóng các cửa sổ xem chi tiết của các món vừa bị xóa!
-            # Đề phòng trường hợp người dùng đang mở xem chi tiết của món ăn đó nhưng món ăn bị xóa mất.
-            # =========================================================================
+            # Đóng các cửa sổ chi tiết của các món vừa bị xóa
             for ten in ten_list:
                 win = active_detail_windows.pop(ten, None)
                 if win and win.winfo_exists():
-                    win.destroy()  # Đóng cửa sổ xem chi tiết
-                    
-            _tai_du_lieu()  # Cập nhật lại toàn bộ bảng chính và thống kê
+                    win.destroy()
+
+            _tai_du_lieu()
             messagebox.showinfo("Thành công", "Đã xóa công thức nấu ăn thành công!")
         else:
             messagebox.showerror("Lỗi", msg)
@@ -309,127 +246,114 @@ def on_xoa():
 
 def on_single_click(event):
     """
-    Xử lý bật/tắt (toggle) dấu checkbox chọn dòng khi click chuột.
-    - Click vào dòng: tick/untick checkbox ☑/☐ của dòng đó.
-    - Click vào tiêu đề (Heading) cột 'Chọn': tự động tick/untick TOÀN BỘ các dòng trên bảng!
+    Xử lý click chuột trên bảng:
+    - Click vào tiêu đề cột 'Chọn': tick/untick toàn bộ dòng.
+    - Click vào ô 'Chọn' của một dòng: đảo trạng thái checkbox dòng đó.
     """
     tree = app_ui["tree"]
-    region = tree.identify_region(event.x, event.y)  # Xác định vùng click chuột (heading, cell, row...)
-    col_str = tree.identify_column(event.x)          # Xác định cột bị click chuột (dạng chuỗi "#1", "#2"...)
+    region  = tree.identify_region(event.x, event.y)   # Vùng click: heading, cell, row...
+    col_str = tree.identify_column(event.x)             # Cột click dạng "#1", "#2"...
     if not col_str:
         return
-    col_idx = int(col_str.replace("#", "")) - 1      # Chuyển đổi thành chỉ số cột (0-indexed)
-    col_name = app_ui["cols"][col_idx]               # Lấy tên cột tương ứng trong danh sách cột
+    col_idx  = int(col_str.replace("#", "")) - 1        # Chuyển thành chỉ số 0-indexed
+    col_name = app_ui["cols"][col_idx]                  # Lấy tên cột tương ứng
 
-    # TRƯỜNG HỢP 1: Click chuột vào tiêu đề cột "Chọn" (Thanh đầu tiên của bảng) -> Chọn/Bỏ chọn tất cả các dòng
+    # Click vào tiêu đề cột "Chọn" → chọn/bỏ chọn tất cả dòng
     if region == "heading" and col_name == "Chọn":
-        cur = tree.heading("Chọn", "text")           # Đọc tiêu đề hiện tại đang hiển thị
-        new_mark = "☑" if "☐" in cur else "☐"        # Đảo trạng thái tiêu đề
-        tree.heading("Chọn", text=new_mark)          # Đổi chữ tiêu đề thành ký tự mới
-        
-        # Duyệt qua toàn bộ tất cả các dòng hiện có trên bảng Treeview
+        cur      = tree.heading("Chọn", "text")
+        new_mark = "☑" if "☐" in cur else "☐"
+        tree.heading("Chọn", text=new_mark)
         for iid in tree.get_children():
-            vals = list(tree.item(iid, "values"))
-            vals[0] = new_mark                       # Gán checkbox của tất cả dòng bằng trạng thái mới
-            tree.item(iid, values=vals)              # Cập nhật lại dòng trên bảng giao diện
+            vals    = list(tree.item(iid, "values"))
+            vals[0] = new_mark
+            tree.item(iid, values=vals)
         return
 
-    # TRƯỜNG HỢP 2: Click chuột trực tiếp vào ô Checkbox (cell Chọn) của một dòng -> Đảo trạng thái dòng đó
+    # Click vào ô checkbox của một dòng → đảo trạng thái dòng đó
     if region == "cell" and col_name == "Chọn":
-        iid = tree.identify_row(event.y)             # Xác định dòng cụ thể bị click chuột
+        iid = tree.identify_row(event.y)
         if iid:
-            vals = list(tree.item(iid, "values"))
-            # Đảo ký hiệu check: ☐ thành ☑ và ngược lại
+            vals    = list(tree.item(iid, "values"))
             vals[0] = "☑" if vals[0] == "☐" else "☐"
-            tree.item(iid, values=vals)              # Cập nhật giao diện cell
+            tree.item(iid, values=vals)
 
 
 def on_double_click(event):
     """
-    Xử lý khi người dùng double-click (click đúp chuột trái) vào một dòng trên bảng chính.
-    Hành động này sẽ mở ra cửa sổ phụ thiết kế đẹp mắt để xem chi tiết hướng dẫn nấu món ăn.
+    Mở cửa sổ chi tiết khi double-click vào dòng trên bảng.
+    Nếu cửa sổ đã mở, chỉ đưa nó lên foreground thay vì mở mới.
     """
     tree = app_ui["tree"]
-    
-    # Chỉ mở chi tiết khi click đúp trúng ô dữ liệu (cell) chứ không phải tiêu đề hay vùng trống
+
     if tree.identify_region(event.x, event.y) != "cell":
         return
-    iid = tree.identify_row(event.y)  # Xác định dòng bị click đúp
+    iid = tree.identify_row(event.y)
     if not iid:
         return
-    
-    vals = list(tree.item(iid, "values"))
-    ten_mon = vals[2]  # Lấy tên món ăn ở cột 2
-    
-    # =========================================================================
-    # ĐỒNG BỘ VÀ TỐI ƯU HÓA:
-    # Nếu cửa sổ chi tiết của món ăn này đã được mở sẵn và đang nằm ở đâu đó trên màn hình,
-    # ta chỉ cần mang nó nổi lên trên cùng (lift) và focus chuột vào nó, tránh mở chồng chất
-    # nhiều cửa sổ trùng lặp gây tốn RAM hệ thống!
-    # =========================================================================
+
+    vals    = list(tree.item(iid, "values"))
+    ten_mon = vals[2]  # Cột 2 là tên món ăn
+
+    # Nếu cửa sổ chi tiết đã mở → đưa lên foreground
     if ten_mon in active_detail_windows:
         win = active_detail_windows[ten_mon]
         if win and win.winfo_exists():
-            win.lift()       # Mang cửa sổ nổi lên trên cùng
-            win.focus_set()  # Đặt tiêu điểm chuột vào cửa sổ
+            win.lift()
+            win.focus_set()
             return
-            
-    # Gọi Model lấy thông tin đầy đủ và mới nhất trực tiếp từ cơ sở dữ liệu SQLite
+
+    # Lấy dữ liệu chi tiết từ DB và mở cửa sổ mới
     current_data, ok = model.lay_chi_tiet(ten_mon)
     if not ok:
         messagebox.showerror("Lỗi", "Không thể lấy chi tiết công thức từ cơ sở dữ liệu SQLite!")
         return
-        
-    # Gọi View hiển thị cửa sổ chi tiết dạng Card
+
     new_win = view.hien_thi_chi_tiet(app_root, current_data)
     if new_win:
-        active_detail_windows[ten_mon] = new_win  # Đăng ký cửa sổ vào danh sách đang mở
-        
-        # Khi cửa sổ này bị tắt đi (sự kiện <Destroy>), ta tự động xóa nó khỏi danh sách active_detail_windows
-        new_win.bind("<Destroy>", lambda e, name=ten_mon, w=new_win: active_detail_windows.pop(name, None) if (e.widget == w) else None)
+        active_detail_windows[ten_mon] = new_win
+        # Khi cửa sổ bị đóng, tự động xóa khỏi danh sách đang mở
+        new_win.bind("<Destroy>", lambda e, name=ten_mon, w=new_win:
+            active_detail_windows.pop(name, None) if (e.widget == w) else None)
 
 
-# ─── LIÊN KẾT SỰ KIỆN VỚI WIDGET GIAO DIỆN (BIND EVENTS) ─────────────────────────
+# ─── GÁN SỰ KIỆN VÀO WIDGET ─────────────────────────────────────────────────────
 
 def _bind_events():
-    """Gán (bind) các hàm xử lý sự kiện trong Controller vào các nút bấm và ô nhập trên giao diện View."""
-    # 1. Điều hướng Sidebar trái
+    """Gán các hàm xử lý sự kiện vào widget tương ứng trên giao diện."""
+    # Điều hướng sidebar
     app_ui["btn_trangchu"].config(command=on_trangchu)
     app_ui["btn_thongke"].config(command=on_thongke)
     app_ui["btn_about"].config(command=on_about)
-    
-    # 2. Thao tác trên trang danh sách công thức (Trang chủ)
+
+    # Thao tác CRUD và tìm kiếm
     app_ui["btn_them"].config(command=on_them)
     app_ui["btn_sua"].config(command=on_sua)
     app_ui["btn_xoa"].config(command=on_xoa)
     app_ui["btn_search"].config(command=on_search)
     app_ui["btn_clear"].config(command=on_clear_search)
-    
-    # 3. Phím tắt và sự kiện thay đổi dữ liệu tìm kiếm
-    app_ui["ent_search"].bind("<Return>", on_search)  # Gõ Enter trong ô tìm kiếm -> Tìm ngay
-    app_ui["cbo_filter"].bind("<<ComboboxSelected>>", on_search)  # Thay đổi bộ lọc loại món -> Tìm ngay
 
-    # 4. Click chuột trên bảng danh sách món ăn
+    # Phím tắt và sự kiện thay đổi bộ lọc
+    app_ui["ent_search"].bind("<Return>", on_search)                  # Enter → tìm ngay
+    app_ui["cbo_filter"].bind("<<ComboboxSelected>>", on_search)      # Đổi loại món → tìm ngay
+
+    # Sự kiện click trên bảng Treeview
     tree = app_ui["tree"]
-    tree.bind("<ButtonRelease-1>", on_single_click)  # Click thả chuột trái -> xử lý checkbox
-    tree.bind("<Double-1>", on_double_click)         # Click đúp chuột trái -> mở xem chi tiết hướng dẫn nấu
+    tree.bind("<ButtonRelease-1>", on_single_click)  # Click đơn → xử lý checkbox
+    tree.bind("<Double-1>", on_double_click)         # Click đúp → xem chi tiết
 
 
-# ─── ĐIỂM KHỞI CHẠY CHÍNH CỦA ỨNG DỤNG (ENTRY POINT) ──────────────────────────
+# ─── ĐIỂM KHỞI CHẠY CHÍNH ───────────────────────────────────────────────────────
 
 def chay_ung_dung():
-    """Khởi chạy ứng dụng đồ họa Quản lý Công thức Nấu ăn Dashboard."""
+    """Khởi chạy ứng dụng Quản lý Công thức Nấu ăn."""
     global app_root, app_ui
     logger.info("Khởi động Quản lý Công thức Nấu ăn Dashboard (GUI)")
-    
-    app_root = tk.Tk()  # Tạo cửa sổ gốc chính Tkinter
-    
-    # Gọi View khởi tạo, thiết kế toàn bộ giao diện và trả về bộ các Widget quản lý
-    app_ui = view.tao_giao_dien_chinh(app_root)
-    
-    _bind_events()  # Thực hiện gán toàn bộ sự kiện click, gõ phím
-    _tai_du_lieu()   # Tải dữ liệu ban đầu từ DB hiển thị lên màn hình
-    
-    app_root.mainloop()  # Chạy vòng lặp sự kiện chính của giao diện, giúp màn hình hiển thị liên tục và không bị tắt!
-    
+
+    app_root = tk.Tk()                                  # Tạo cửa sổ Tkinter gốc
+    app_ui   = view.tao_giao_dien_chinh(app_root)       # Khởi tạo toàn bộ giao diện
+    _bind_events()                                      # Gán sự kiện vào widget
+    _tai_du_lieu()                                      # Tải dữ liệu ban đầu từ DB
+
+    app_root.mainloop()                                 # Vòng lặp sự kiện chính
+
     logger.info("Thoát ứng dụng Công thức Nấu ăn Dashboard (GUI)")
