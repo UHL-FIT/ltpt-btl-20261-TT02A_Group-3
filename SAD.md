@@ -56,6 +56,10 @@ Tài liệu này mô tả kiến trúc tổng thể của ứng dụng **Quản 
 └──────────────────────┘
 ```
 
+> **Hình 1. Kiến trúc hệ thống Quản Lý Công Thức Nấu Ăn (MVC)**
+>
+> ![Hình 1 – Kiến trúc MVC](assets/hinh1_kien_truc_mvc.png)
+
 ### Vai trò từng tầng
 
 | Tầng | File | Nhiệm vụ |
@@ -268,6 +272,10 @@ View.hien_thi_thong_ke(parent, stats)
 [Popup Thống kê hiển thị]
 ```
 
+> **Hình 2. Sơ đồ tuần tự xử lý thêm và tìm kiếm công thức**
+>
+> ![Hình 2 – Sequence Diagram](assets/hinh2_sequence_diagram.png)
+
 ---
 
 ## 6. Công nghệ Sử dụng
@@ -283,6 +291,10 @@ View.hien_thi_thong_ke(parent, stats)
 | **Pillow** | ≥ 9.0 | Hiển thị hình ảnh món ăn trong cửa sổ chi tiết |
 | **logging** | stdlib | Ghi log ứng dụng ra `data/app.log` |
 | **unittest** | stdlib | Kiểm thử tự động |
+
+> **Bảng 1. Công nghệ và thư viện sử dụng**
+>
+> ![Bảng 1 – Công nghệ sử dụng](assets/bang_cong_nghe.png)
 
 ---
 
