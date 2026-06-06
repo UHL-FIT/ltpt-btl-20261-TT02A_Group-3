@@ -15,8 +15,9 @@ Tài liệu này mô tả kiến trúc tổng thể của ứng dụng **Quản 
 
 ## 2. Kiến trúc Tổng thể (Architectural Pattern)
 
-Ứng dụng được xây dựng theo kiến trúc **MVC (Model – View – Controller)** kết hợp mô hình phân lớp đơn giản dành cho Desktop, triển khai ở cấp độ **module (không dùng class)** để phù hợp với trình độ Python cơ bản.
+Ứng dụng được xây dựng theo kiến trúc **MVC (Model – View – Controller)** kết hợp mô hình phân lớp đơn giản dành cho Desktop, và nay được mở rộng thêm phân hệ **Web API Controller** để phục vụ việc giao tiếp dữ liệu liên hệ thống. Tất cả được triển khai ở cấp độ **module (không dùng class)** để phù hợp với trình độ Python cơ bản.
 
+### 2.1 Mô hình Desktop GUI (Tkinter)
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                        USER                              │
@@ -56,19 +57,57 @@ Tài liệu này mô tả kiến trúc tổng thể của ứng dụng **Quản 
 └──────────────────────┘
 ```
 
-> **Hình 1. Kiến trúc hệ thống Quản Lý Công Thức Nấu Ăn (MVC)**
->
-> ![Hình 1 – Kiến trúc MVC](assets/hinh1_kien_truc_mvc.png)
+> **Hình 1. Kiến trúc hệ thống Quản Lý Công Thức Nấu Ăn (MVC Desktop)**
 
-### Vai trò từng tầng
+### 2.2 Mô hình Web API (Flask)
+Khi mở rộng ứng dụng để hỗ trợ Web API, cấu trúc MVC được giữ vững nhưng có thêm một **API Controller** (`controllers/api_controller.py`) độc lập hoạt động song song với giao diện Desktop Tkinter. 
+
+Các ứng dụng khách (như trang web React, ứng dụng điện thoại hoặc các script kiểm thử tự động) sẽ gửi yêu cầu HTTP. API Controller nhận yêu cầu, gọi Model để truy vấn/thao tác dữ liệu, và định dạng dữ liệu trả về thành JSON.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│              EXTERNAL CLIENTS (View ngoài)               │
+│        (Web Browser, Mobile App, 3rd party script)       │
+└────────────────────────┬─────────────────────────────────┘
+                         │ gửi HTTP Request (GET/POST/PUT/DELETE)
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│            API CONTROLLER (api_controller.py)            │
+│  Lắng nghe cổng HTTP 5000 (Flask web server)             │
+│  • Nhận dữ liệu HTTP GET/POST/PUT/DELETE                 │
+│  • Gọi Model xử lý dữ liệu                               │
+│  • Trả về HTTP Response dạng dữ liệu JSON                │
+└────────────────────────┬─────────────────────────────────┘
+                         │ gọi hàm
+                         ▼
+┌──────────────────────┐ │ trả về (df, ok, msg) hoặc chi tiết dict
+│  MODEL (congthuc.py) │─┘
+│  • CRUD SQLite DB    │
+│  • Thống kê numpy    │
+└──────────┬───────────┘
+           │ đọc / ghi
+           ▼
+┌──────────────────────┐
+│   DATA SOURCE        │
+│   data/congthuc.db   │
+│   (SQLite3)          │
+└──────────────────────┘
+```
+
+> **Hình 2. Kiến trúc Web API tích hợp trong MVC**
+
+### Vai trò từng tầng trong hệ thống mở rộng
 
 | Tầng | File | Nhiệm vụ |
 |------|------|----------|
-| **Model** | `models/congthuc.py` | CRUD dữ liệu SQLite3; trả về DataFrame; tính toán thống kê bằng `pandas` và `numpy` |
-| **View** | `views/gui_view_congthuc.py` | Xây dựng và hiển thị toàn bộ widget Tkinter; không chứa logic nghiệp vụ |
-| **Controller** | `controllers/gui_controller_congthuc.py` | Bắt sự kiện từ View, validate, gọi Model, cập nhật lại View |
+| **Model** | `models/congthuc.py` | CRUD dữ liệu SQLite3; trả về DataFrame/dict; tính toán thống kê bằng `pandas` và `numpy` |
+| **View (Desktop)** | `views/gui_view_congthuc.py` | Xây dựng và hiển thị toàn bộ widget Tkinter; không chứa logic nghiệp vụ |
+| **View (External)** | Client ứng dụng web/mobile | Nhận phản hồi JSON từ API và render giao diện cho người dùng |
+| **Controller (GUI)** | `controllers/gui_controller_congthuc.py` | Bắt sự kiện từ Tkinter View, validate, gọi Model, cập nhật lại Tkinter View |
+| **Controller (API)** | `controllers/api_controller.py` | Khởi động máy chủ web Flask, lắng nghe HTTP Request, validate, gọi Model, trả về JSON |
 | **Utility** | `utils/logger.py` | Ghi log DEBUG/INFO/ERROR ra file `data/app.log` |
-| **Entry Point** | `main.py` | Khởi động ứng dụng GUI |
+| **Entry Point (GUI)** | `main.py` | Khởi động ứng dụng Desktop GUI |
+| **Entry Point (API)** | `main_api.py` | Khởi động máy chủ Web API phục vụ môi trường mạng |
 
 ---
 

@@ -840,15 +840,16 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
 
         # Cấu trúc kiểm tra nhanh các trường bắt buộc phải có (*)
         checks = [
-            (not ten,   "⚠  Tên món ăn không được để trống!",    ent_ten),
-            (not loai,  "⚠  Vui lòng chọn Loại món ăn!",          None),
-            (not tg_str,"⚠  Vui lòng nhập Thời gian chuẩn bị!",  ent_tg),
+            (not ten,       "⚠  Tên món ăn không được để trống!",              ent_ten),
+            (len(ten) > 100, "⚠  Tên món ăn không được quá 100 ký tự!",         ent_ten),
+            (not loai,      "⚠  Vui lòng chọn Loại món ăn!",                   None),
+            (not tg_str,    "⚠  Vui lòng nhập Thời gian chuẩn bị!",            ent_tg),
         ]
         
         for cond, msg, widget in checks:
             if cond:
                 lbl_err.config(text=msg)
-                if widget: widget.focus_set() # Tự động đặt nháy chuột vào ô bị thiếu dữ liệu
+                if widget: widget.focus_set()
                 return
                 
         # Validate kiểu dữ liệu thời gian chuẩn bị
@@ -859,6 +860,14 @@ def hien_thi_form(parent, is_edit=False, current_data=None):
             lbl_err.config(text="⚠  Thời gian chuẩn bị phải là số nguyên >= 0!")
             ent_tg.focus_set()
             return
+
+        # TC-07: Kiểm tra số lượng nguyên liệu và định lượng phải khớp nhau
+        if nl or dl:
+            nl_items = [x.strip() for x in nl.split("|") if x.strip()]
+            dl_items = [x.strip() for x in dl.split("|") if x.strip()]
+            if len(nl_items) != len(dl_items):
+                lbl_err.config(text="⚠  Số lượng định lượng không khớp với nguyên liệu!")
+                return
 
         # Nạp dữ liệu hợp lệ vào từ điển kết quả
         result.append({"ten_mon": ten, "loai_mon": loai,

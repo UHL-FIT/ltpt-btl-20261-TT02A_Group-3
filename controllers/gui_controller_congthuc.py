@@ -103,22 +103,30 @@ def _apply_filter(df):
         # Tách từ khóa tìm kiếm thành danh sách các từ riêng biệt để thực hiện tìm kiếm AND logic
         # Ví dụ: từ khóa "cá thu" sẽ tách thành ["ca", "thu"]
         kw_parts = [remove_accents(k) for k in keyword.split()]
-        
-        # Hàm nội bộ kiểm tra xem một dòng dữ liệu (row) có thỏa mãn từ khóa hay không
-        def check_row(row):
-            # Ghép tất cả các cột dữ liệu của dòng đó (tên món, loại món, nguyên liệu, cách nấu...)
-            # thành một chuỗi văn bản dài duy nhất, xóa dấu tiếng Việt và đưa về chữ thường.
-            # Điều này cực kỳ mạnh mẽ vì cho phép người dùng tìm kiếm chéo cột!
-            row_str = remove_accents(" ".join(row.astype(str)).lower())
-            
-            # Kiểm tra xem TẤT CẢ các từ trong danh sách từ khóa tìm kiếm (kw_parts) có nằm trong chuỗi dài này hay không
-            # Ví dụ: Món ăn phải chứa cả từ "ca" và từ "thu" thì mới thỏa mãn (AND logic)
-            return all(k in row_str for k in kw_parts)
-            
-        # Áp dụng hàm check_row lên từng dòng của DataFrame (axis=1 nghĩa là duyệt theo chiều ngang dòng)
-        # mask sẽ là một mảng chứa các giá trị True/False
-        mask = df.apply(check_row, axis=1)
-        df = df[mask]  # Chỉ giữ lại các dòng có giá trị True (thỏa mãn tìm kiếm)
+
+        # TC-18 FIX: Thay thế check_row + apply() bằng vectorized pandas str.contains.
+        # Cách cũ dùng " ".join(row.astype(str)) nối tất cả cột thành 1 chuỗi dài, gây ra
+        # lỗi nhận diện từ khóa con khi dữ liệu số (thoi_gian) hoặc NaN xen vào.
+        # Cách mới: normalize riêng từng cột text quan trọng rồi dùng str.contains(regex=False)
+        # cho mỗi từ khóa - đảm bảo tìm "cua" trong "Súp cua biển" luôn chính xác.
+        def normalize_col(series):
+            """Chuẩn hóa cột pandas: chuyển sang str, xóa dấu, đưa về chữ thường."""
+            return series.astype(str).apply(lambda x: remove_accents(x.lower()))
+
+        # Ghép tên món + loại món + nguyên liệu thành chuỗi tìm kiếm tổng hợp
+        search_series = (
+            normalize_col(df["ten_mon"]) + " " +
+            normalize_col(df["loai_mon"]) + " " +
+            normalize_col(df["nguyen_lieu"])
+        )
+
+        # Với mỗi từ khóa: dùng str.contains(regex=False) - tìm kiếm chuỗi con đơn giản, không regex
+        # Kết hợp AND: tất cả các từ đều phải xuất hiện trong chuỗi tổng hợp
+        mask = pd.Series([True] * len(df), index=df.index)
+        for kw in kw_parts:
+            mask = mask & search_series.str.contains(kw, regex=False, na=False)
+
+        df = df[mask]  # Chỉ giữ lại các dòng thỏa mãn toàn bộ từ khóa tìm kiếm
 
     return df
 
