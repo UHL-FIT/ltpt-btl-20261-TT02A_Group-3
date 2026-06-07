@@ -66,30 +66,37 @@ def _apply_filter(df):
         df = df[df["loai_mon"] == loai]
 
     # Lọc theo từ khóa tìm kiếm
-    keyword = app_ui["ent_search"].get().strip().lower()
+    keyword = app_ui["ent_search"].get().strip()
     if keyword:
 
         def remove_accents(input_str):
-            """Xóa dấu tiếng Việt và chuẩn hóa chữ đ/Đ thành d/D."""
+            """Xóa dấu tiếng Việt, chuẩn hóa chữ đ/Đ thành d/D.
+            Dùng NFC trước để đồng nhất ký tự từ các bộ gõ tiếng Việt khác nhau,
+            sau đó NFKD để tách dấu ra khỏi ký tự gốc."""
             if not isinstance(input_str, str):
                 input_str = str(input_str)
-            s = unicodedata.normalize('NFKD', input_str)
+            # Bước 1: NFC để chuẩn hóa về dạng hợp thành (phòng trường hợp bộ gõ gửi dạng NFD)
+            s = unicodedata.normalize('NFC', input_str)
+            # Bước 2: NFKD để phân tách ký tự có dấu thành ký tự gốc + combining marks
+            s = unicodedata.normalize('NFKD', s)
+            # Bước 3: Loại bỏ các combining marks (dấu thanh, dấu mũ, v.v.)
             s = "".join([c for c in s if not unicodedata.combining(c)])
+            # Bước 4: Xử lý riêng chữ đ/Đ (không bị NFKD phân tách)
             return s.replace('đ', 'd').replace('Đ', 'D')
 
-        # Tách từ khóa thành từng từ để tìm kiếm AND logic
-        kw_parts = [remove_accents(k) for k in keyword.split()]
+        # Chuẩn hóa NFC cho từ khóa người dùng nhập rồi mới lowercase
+        keyword_normalized = unicodedata.normalize('NFC', keyword).lower()
+
+        # Tách từ khóa thành từng từ để tìm kiếm AND logic (mỗi từ phải xuất hiện)
+        kw_parts = [remove_accents(k) for k in keyword_normalized.split()]
 
         def normalize_col(series):
             """Chuẩn hóa cột pandas: chuyển sang str, xóa dấu, đưa về chữ thường."""
             return series.astype(str).apply(lambda x: remove_accents(x.lower()))
 
-        # Ghép các cột tìm kiếm thành một chuỗi tổng hợp
-        search_series = (
-            normalize_col(df["ten_mon"]) + " " +
-            normalize_col(df["loai_mon"]) + " " +
-            normalize_col(df["nguyen_lieu"])
-        )
+        # Chỉ tìm kiếm trên cột tên món ăn (ten_mon)
+        # Không tìm trong nguyen_lieu để tránh trả về các món có nguyên liệu trùng từ khóa
+        search_series = normalize_col(df["ten_mon"])
 
         # AND logic: tất cả từ khóa phải xuất hiện trong chuỗi tổng hợp
         mask = pd.Series([True] * len(df), index=df.index)
